@@ -4,7 +4,12 @@
 export const BLOCKS = ['A', 'B', 'C', 'D'];
 
 // Empty "Blocks" means these start letters, by session length. From the spec table.
+// A 1-block session with no Blocks given runs three times, not four, and which
+// block it sits out is chosen per session by spreadSpareBlocks() below. The
+// other lengths cannot run three times — a 2-block session only fits two
+// non-overlapping runs in a day, and a 3- or 4-block session only fits one.
 const DEFAULT_STARTS = { 1: 'ABCD', 2: 'AC', 3: 'A', 4: 'A' };
+const DEFAULT_RUNS_FOR_1_BLOCK = 3;
 
 const YES = new Set(['yes', 'y', '1', 'true']);
 const NO = new Set(['no', 'n', '0', 'false']);
@@ -141,6 +146,35 @@ const SESSION_COLS = {
 };
 
 /**
+ * Decides which single block each "Blocks left blank" 1-block session sits out.
+ *
+ * Sessions that named their blocks are counted first, then each blank one sits
+ * out whichever block is fullest at that moment, so the four blocks end up
+ * holding roughly the same number of seats. Capacity is what is balanced, not
+ * the number of sessions, because one 60-seat session outweighs three 10-seat
+ * ones. Sessions arrive sorted by name and ties go to the earliest block, so
+ * the result never depends on the order of the rows in the file.
+ */
+function spreadSpareBlocks(sessions) {
+  const seats = new Array(BLOCKS.length).fill(0);
+  const add = s => {
+    for (const start of s.starts) {
+      for (let i = 0; i < s.length; i++) seats[start + i] += s.capacity;
+    }
+  };
+  sessions.filter(s => !s.blocksBlank).forEach(add);
+
+  for (const s of sessions) {
+    if (!s.blocksBlank) continue;
+    let fullest = 0;
+    for (let b = 1; b < BLOCKS.length; b++) if (seats[b] > seats[fullest]) fullest = b;
+    s.starts = BLOCKS.map((_, b) => b).filter(b => b !== fullest);
+    s.sitsOut = fullest;           // which block it skips, for anyone who asks
+    add(s);
+  }
+}
+
+/**
  * A set of start blocks is valid iff every run ends by block D and no two runs
  * overlap. `starts` are 0-based block indices, already sorted ascending.
  */
@@ -194,6 +228,10 @@ export function parseSessions(rows, report = new Report()) {
     const length = Number(lenRaw);
 
     let blocksRaw = cell(row, col.blocks).toUpperCase().replace(/[\s,]/g, '');
+    // Blocks left blank on a 1-block session: start from all four and drop one
+    // later, once every session's capacity is known. Spelling out ABCD still
+    // means all four.
+    const blocksBlank = !blocksRaw && length === 1;
     if (!blocksRaw) blocksRaw = DEFAULT_STARTS[length];
     const bad = [...blocksRaw].filter(c => !BLOCKS.includes(c));
     if (bad.length) {
@@ -230,6 +268,7 @@ export function parseSessions(rows, report = new Report()) {
       email: isEmail(email) ? email : '',
       location: cell(row, col.location),
       surveyColumn: cell(row, col.surveyColumn),
+      blocksBlank,
     });
   }
   if (!sessions.length && !report.errors.length) report.error('Sessions file has no sessions in it.');
@@ -237,6 +276,8 @@ export function parseSessions(rows, report = new Report()) {
   // solver's variable order, and so dropdowns read alphabetically. Everything
   // downstream refers to sessions by index, so this must happen here or nowhere.
   sessions.sort((a, b) => (key(a.name) < key(b.name) ? -1 : 1));
+
+  spreadSpareBlocks(sessions);
 
   // What a student sees. A session name is often a whole sentence — the title
   // plus a description — and only the title belongs on a schedule sheet. The

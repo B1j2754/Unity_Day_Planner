@@ -34,11 +34,39 @@ test('start blocks must fit the length', () => {
   assert.ok(says(sessionsOf('past-d-starts.csv').report.errors, 'overlap or run past block D'));
 });
 
-test('empty Blocks expands by length: 1 -> ABCD, 2 -> AC, 3 -> A, 4 -> A', () => {
+test('empty Blocks: a 1-block session runs three times, the other lengths are unchanged', () => {
   const { sessions, report } = sessionsOf('empty-blocks.csv');
   assert.deepEqual(report.errors, []);
   const starts = Object.fromEntries(sessions.map(s => [s.name, s.starts.map(b => BLOCKS[b]).join('')]));
-  assert.deepEqual(starts, { Solo: 'ABCD', Duo: 'AC', Trio: 'A', Quad: 'A' });
+  // Solo sits out whichever block was fullest; Duo, Trio and Quad cannot run
+  // three times, so their defaults stand.
+  assert.deepEqual(starts, { Solo: 'BCD', Duo: 'AC', Trio: 'A', Quad: 'A' });
+  assert.equal(sessions.find(s => s.name === 'Solo').sitsOut, BLOCKS.indexOf('A'));
+});
+
+test('spelling out ABCD still means all four blocks', () => {
+  const rows = fixture('empty-blocks.csv');
+  rows.find(r => r[0] === 'Solo')[5] = 'ABCD';
+  const report = new Report();
+  const { sessions } = parseSessions(rows, report);
+  assert.deepEqual(report.errors, [], report.errors.join('\n'));
+  const solo = sessions.find(s => s.name === 'Solo');
+  assert.deepEqual(solo.starts.map(b => BLOCKS[b]), ['A', 'B', 'C', 'D']);
+  assert.equal(solo.blocksBlank, false, 'an explicit value is never trimmed');
+});
+
+test('the block each blank session sits out balances the seats across the day', () => {
+  const { sessions } = sessionsOf('sessions.csv');
+  const seats = BLOCKS.map(() => 0);
+  for (const s of sessions) {
+    for (const start of s.starts) for (let i = 0; i < s.length; i++) seats[start + i] += s.capacity;
+  }
+  // Before spreading, block B held twice what A did. Now nothing is far out.
+  assert.ok(Math.max(...seats) - Math.min(...seats) <= 3, `seats were ${seats}`);
+  for (const s of sessions.filter(x => x.blocksBlank)) {
+    assert.equal(s.starts.length, 3, `${s.name} should run three times`);
+    assert.ok(!s.starts.includes(s.sitsOut));
+  }
 });
 
 test('a missing description row is a warning, not a lost session', () => {

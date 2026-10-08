@@ -30,7 +30,7 @@ Columns:
     * Capacity is **per run**. A session that runs in blocks A and C with capacity 20 can hold 20 students in the A run and 20 different students in the C run.
 * "Blocks"
     * The blocks in which a run of this session **starts**. The session runs once for each letter listed.
-    * Empty value, a.k.a. "", means back-to-back runs starting at A until the end of the day (see table below)
+    * Empty value, a.k.a. "", means the app picks the start blocks (see table below). For a 1-block session that is __three__ of the four blocks, not all four; for the other lengths it is back-to-back runs starting at A.
     * The string can only contain the characters `A`, `B`, `C`, or `D`
     * Duplicate letters get flagged as an issue, but order of letters does not matter
     * A string such as `AB` means it supports blocks `A` and `B`, but not `C` or `D`. A session of length 2 block cannot exist for more than two blocks: `A` and `C`, as it would collide otherwise.
@@ -40,10 +40,14 @@ Columns:
     >
     > | Length | Empty "Blocks" means | Runs |
     > |---|---|---|
-    > | 1 | `ABCD` | A, B, C, D |
+    > | 1 | three of `A`, `B`, `C`, `D`, chosen by the app | 3 runs, one block sat out |
     > | 2 | `AC` | A–B, C–D |
     > | 3 | `A` | A–C |
     > | 4 | `A` | A–D |
+    >
+    > **Clarification: which block a 1-block session sits out.** Only length 1 can run three times — a 2-block session only fits two non-overlapping runs in a day, and a 3- or 4-block session only fits one — so only length 1 has a block to choose. Writing `ABCD` out in full still means all four runs; the three-run default applies only when the cell is blank.
+    >
+    > The app picks the sat-out block to keep the four blocks holding roughly the same number of seats. It counts every session that named its own blocks first, then goes through the blank ones and has each sit out whichever block is fullest at that point. Capacity is what gets balanced, not the number of sessions, because one 60-seat session outweighs three 10-seat ones. Sessions are processed in name order and ties go to the earliest block, so the result never depends on the row order of the file.
 * "Length of Session (in blocks)"
     * The amount of blocks a session occupies
     * **MUST** be a positive and greater-than-zero integer, in the range: 1 <= x <= 4
@@ -291,6 +295,8 @@ Input validation (each has a fixture file with the expected error/warning):
 * Invalid or duplicate block letters
 * Length out of range, or start blocks incompatible with length (`BC` at length 2, `D` at length 2)
 * Empty Blocks expands to the default table above
+* A blank "Blocks" on a 1-block session gives three runs, and the sat-out blocks balance the seats across the day
+* An explicit `ABCD` still gives four runs
 * Session with no matching response column
 * Prefix collision (`Art` vs `Art History`)
 * Long names matched on their short title, and two sessions sharing a short title

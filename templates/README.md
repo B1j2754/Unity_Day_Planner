@@ -32,14 +32,25 @@ skips it. Your sessions start on row 3.
 | Can be Randomly Assigned? | `Yes` or `No` — may students who never filled in the survey be put here? **Leave it blank and it means `Yes`.** |
 | Survey Column | Optional, and usually left empty. The exact heading of this session's column in the responses file, for when the two sheets name it too differently to pair up on their own. See below. |
 
-**Leaving Blocks blank** gives you back-to-back runs from A to the end of the day:
+**Leaving Blocks blank** lets the app choose:
 
 | Length | Blank Blocks means | Runs |
 |---|---|---|
-| 1 | `ABCD` | A, B, C, D |
+| 1 | three of A, B, C, D, chosen for you | 3 runs, one block sat out |
 | 2 | `AC` | A–B, C–D |
 | 3 | `A` | A–C |
 | 4 | `A` | A–D |
+
+A 1-block session with Blocks left blank runs **three times, not four**. Only
+length 1 has a choice to make — a 2-block session only fits two non-overlapping
+runs in a day, and a 3- or 4-block session only fits one. If you want all four,
+write `ABCD` in the cell.
+
+Which block each one sits out is picked to keep the four blocks holding about
+the same number of seats: sessions that named their own blocks are counted
+first, then each blank one sits out whichever block is fullest so far. Big
+sessions count for more than small ones, and the same files always give the same
+answer. To decide for a particular session yourself, just fill its Blocks in.
 
 If you do fill Blocks in, every run has to finish by block D and no two runs of
 the same session may overlap. So `BC` at length 2 is rejected (B–C and C–D would
