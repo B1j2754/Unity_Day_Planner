@@ -1,0 +1,10 @@
+node_modules/
+.DS_Store
+
+# Real student data must never be committed. Spreadsheets dropped at the repo
+# root, or anywhere under private/, are ignored. templates/ and tests/fixtures/
+# stay tracked because they hold no real data.
+/*.csv
+/*.xlsx
+/*.xls
+private/

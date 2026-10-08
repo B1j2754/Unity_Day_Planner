@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unity Day Planner</title>
+<meta name="description" content="Assigns students to Unity Day sessions from their survey answers. Runs entirely in your browser.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#128197;</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;550;600;650;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/components.css">
+<script>
+  // Before first paint, so the page never flashes the wrong theme.
+  try { document.documentElement.dataset.theme = localStorage.getItem('theme') || 'dark'; } catch {}
+</script>
+</head>
+<body>
+<main class="page stack" style="gap:var(--s-5)">
+
+  <header class="row">
+    <div>
+      <h1 class="title">Unity Day Planner</h1>
+      <p class="subtitle">Turns the survey answers into a schedule for every student.</p>
+    </div>
+    <button class="toggle row-end" id="theme" type="button">
+      <span class="icon icon-sm" id="theme-icon">dark_mode</span><span id="theme-label">Dark</span>
+    </button>
+  </header>
+
+  <!-- ------------------------------------------------- 1. Upload -->
+  <section class="card stack">
+    <div class="card-head">
+      <span class="step-num">1</span>
+      <h2 class="h2">Upload the files</h2>
+      <span class="badge row-end">.csv or .xlsx</span>
+    </div>
+
+    <div class="stack" style="gap:var(--s-3)" id="drops"></div>
+
+    <div class="stack-sm">
+      <p class="hint">Starting from scratch? Download a blank template:</p>
+      <div class="btn-row">
+        <a class="btn btn-sm" href="templates/Sessions.csv" download>
+          <span class="icon icon-sm">table</span>Sessions
+        </a>
+        <a class="btn btn-sm" href="templates/StudentResponses.csv" download>
+          <span class="icon icon-sm">table</span>Student responses
+        </a>
+        <a class="btn btn-sm" href="templates/NonRespondents.csv" download>
+          <span class="icon icon-sm">table</span>Non-respondents
+        </a>
+        <a class="btn btn-sm" href="templates/Overrides.csv" download>
+          <span class="icon icon-sm">table</span>Overrides
+        </a>
+      </div>
+    </div>
+
+    <details class="disclosure" id="problems" hidden>
+      <summary class="btn btn-sm">
+        <span class="icon icon-sm" id="problems-icon">checklist</span>
+        <span id="problems-label">Show every problem</span>
+      </summary>
+      <div class="stack disclosure-body" style="gap:var(--s-3)" id="problems-list"></div>
+    </details>
+
+    <div class="notice">
+      <span class="icon">lock</span>
+      <div class="notice-body">Nothing is uploaded anywhere. The files are read inside this browser tab and
+        disappear when you close it.</div>
+    </div>
+
+    <div class="row">
+      <button class="btn btn-primary" id="generate" disabled>
+        <span class="icon icon-sm">auto_awesome</span><span id="generate-label">Generate schedules</span>
+      </button>
+      <p class="hint" id="generate-hint">Add the sessions and student responses files to start.</p>
+    </div>
+  </section>
+
+  <!-- ------------------------------------- 2. Review &amp; overrides -->
+  <section class="card stack" id="review" hidden>
+    <div class="card-head">
+      <span class="step-num">2</span>
+      <h2 class="h2">Review</h2>
+    </div>
+
+    <div class="metrics" id="metrics"></div>
+    <div class="stack" style="gap:var(--s-3)" id="messages"></div>
+
+    <hr class="divider">
+
+    <div class="stack">
+      <div>
+        <h3 class="h2" style="font-size:18px">Look up a student</h3>
+        <p class="hint">Find one student's schedule. Use <em>Keep this</em> to lock a block in place, or
+          <em>Not this</em> to send them somewhere else, then re-generate.</p>
+      </div>
+      <div class="field" style="max-width:420px">
+        <label class="label" for="lookup">Name or email</label>
+        <input class="input" id="lookup" type="search" list="student-list" placeholder="Start typing a name&hellip;" autocomplete="off">
+        <datalist id="student-list"></datalist>
+      </div>
+      <div id="lookup-result"></div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="stack">
+      <div class="row">
+        <div>
+          <h3 class="h2" style="font-size:18px">Overrides</h3>
+          <p class="hint">Exceptions that beat every other rule. Nothing re-runs until you press the button.</p>
+        </div>
+        <span class="badge row-end" id="override-count">0</span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Student</th><th>Type</th><th>Session</th><th>Block</th><th>Note</th><th></th></tr></thead>
+          <tbody id="override-rows"></tbody>
+        </table>
+      </div>
+
+      <details class="disclosure" id="add-override">
+        <summary class="btn btn-sm">
+          <span class="icon icon-sm">add</span>Add an override
+        </summary>
+        <div class="stack disclosure-body" style="gap:var(--s-3)">
+          <div class="row" style="align-items:flex-end">
+            <div class="field" style="flex:2 1 220px">
+              <label class="label" for="ov-student">Student</label>
+              <input class="input" id="ov-student" list="student-list" placeholder="Name or email" autocomplete="off">
+            </div>
+            <div class="field" style="flex:1 1 130px">
+              <label class="label" for="ov-type">Type</label>
+              <select class="select" id="ov-type">
+                <option value="Pin">Pin &mdash; must be in</option>
+                <option value="Exclude">Exclude &mdash; never in</option>
+                <option value="Free">Free &mdash; no session</option>
+              </select>
+            </div>
+            <div class="field" style="flex:2 1 200px" id="ov-session-field">
+              <label class="label" for="ov-session">Session</label>
+              <select class="select" id="ov-session"></select>
+            </div>
+            <div class="field" style="flex:0 1 120px">
+              <label class="label" for="ov-block">Block</label>
+              <select class="select" id="ov-block"></select>
+            </div>
+          </div>
+          <div class="row" style="align-items:flex-end">
+            <div class="field" style="flex:1 1 260px">
+              <label class="label" for="ov-note">Note (optional)</label>
+              <input class="input" id="ov-note" placeholder="Requested by Ms. Smith">
+            </div>
+            <button class="btn btn-primary" id="ov-add" type="button">Add</button>
+          </div>
+          <p class="hint" id="ov-error"></p>
+        </div>
+      </details>
+
+      <div class="row">
+        <button class="btn btn-primary" id="regenerate">
+          <span class="icon icon-sm">refresh</span>Re-generate with overrides
+        </button>
+        <button class="btn" id="dl-overrides">
+          <span class="icon icon-sm">download</span>Download Overrides.csv
+        </button>
+        <p class="hint" id="dirty-hint" hidden>Unsaved overrides &mdash; download them to keep them for next time.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ----------------------------------------------- 3. Download -->
+  <section class="card stack" id="download" hidden>
+    <div class="card-head">
+      <span class="step-num">3</span>
+      <h2 class="h2">Download</h2>
+    </div>
+    <div class="row">
+      <button class="btn btn-primary" id="dl-merge">
+        <span class="icon icon-sm">mail</span>Mail merge (.xlsx)
+      </button>
+      <button class="btn" id="dl-pngs">
+        <span class="icon icon-sm">image</span>Schedule images (.zip)
+      </button>
+      <button class="btn btn-danger" id="dl-unplaced" hidden>
+        <span class="icon icon-sm">person_alert</span>Unplaced students (.csv)
+      </button>
+    </div>
+    <p class="hint" id="download-hint"></p>
+  </section>
+
+  <footer class="hint" style="text-align:center">
+    <a href="components.html" style="color:inherit">UI components</a> &middot;
+    Everything runs in this tab. Questions: Benjamin Clark, b1j2754@gmail.com
+  </footer>
+
+</main>
+
+<script src="vendor/xlsx.min.js"></script>
+<script src="vendor/fflate.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

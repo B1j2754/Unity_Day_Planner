@@ -1,0 +1,115 @@
+# Unity Day Planner — agent instructions
+
+Read `spec_sheet.md` first. It is the human-written contract; this file is only
+how to work in the repo. Where they disagree, `spec_sheet.md` wins.
+
+## What this is
+
+A static, single-page browser app that assigns students to Unity Day sessions.
+No backend, no build step. Open `index.html` and it runs. Deployed to GitHub
+Pages straight from the repo root.
+
+## Hard rules
+
+1. **Nothing leaves the browser.** No fetch to a third party, no analytics, no
+   CDN at runtime — that is why `vendor/` is committed instead. Any feature
+   that would send data off the user's machine needs Benjamin Clark
+   (b1j2754@gmail.com) to say yes first.
+2. **No real student data in the repo.** `tests/fixtures/` is generated or
+   anonymized, and `templates/` holds blank headers only. If someone drops a
+   real export in here, it does not get committed.
+3. **No build step.** Plain ES modules, relative paths, no bundler, no
+   transpile. If you reach for a bundler, you have taken a wrong turn.
+4. **The Power Automate contract is frozen.** `unity-day_mail-merge.xlsx`,
+   columns `Email` / `Name` / `Schedule_HTML`. Changing any of those four
+   strings breaks a live Outlook flow.
+5. **Determinism.** Same inputs, same bytes out. All randomness is seeded
+   (`js/solve.js` `hash()`), ties break on sorted email, HiGHS runs with
+   `random_seed` fixed and zero MIP gap. Row order of an input file must never
+   change the result.
+6. **`npm test` must pass before you call anything done.**
+
+## Layout
+
+```
+index.html         the app — upload / review / download
+components.html    the UI component library, rendered. Look here before styling anything.
+templates/         blank input files staff download from the page, plus the column-by-column guide
+css/components.css the library itself: tokens + every component class
+js/parse.js        CSV text -> validated sessions / students / overrides  (pure, no DOM)
+js/solve.js        validated data -> assignments                          (pure, no DOM)
+js/output.js       assignments -> mail-merge rows, schedule HTML, PNG, CSVs
+js/app.js          all the DOM wiring. The only file that touches the page.
+js/solver.worker.js  runs solve.js off the main thread
+vendor/            highs (WASM solver), xlsx (SheetJS), fflate (zip). Committed on purpose.
+tests/             node:test, no framework
+```
+
+`templates/*.csv` are the headers the parser actually looks for. Change a
+column name in `js/parse.js` and you change it in the template and in
+`templates/README.md` in the same commit, or staff get a file the app rejects.
+
+`parse.js` and `solve.js` must stay DOM-free — the tests import them directly in
+Node. Keep file reading (`File`, `XLSX`) in `app.js`.
+
+## The UI component library
+
+`css/components.css` is the single source of style. Rules:
+
+- Every element on the page is a clone of something in there.
+- You may **copy** styles and **add** new components. You may never delete one.
+- A new component has to look like it belongs with what is already there — same
+  tokens, same radii, same spacing scale.
+- Add it to `components.html` in the same commit, or it does not exist.
+- Native controls that look like 1998 by default (`button`, `input[type=file]`,
+  `select`, checkboxes) are always custom styled.
+- No component libraries, no frameworks, no "advanced" widgets. If a plain
+  search input, dropdown, button or table genuinely cannot do the job, ask
+  Benjamin before inventing one.
+- Light and dark both have to look right. Dark is the default.
+- Fonts and icons come from Google Fonts only (currently Inter + Material
+  Symbols, both vendored-by-link in `index.html`'s `<head>`).
+
+## Style of the code
+
+Boring and short. The solver is the only genuinely hard part of this repo; keep
+everything around it dull enough that a teacher could follow it next year.
+
+- No abstraction with one caller. No config object for a value that never
+  changes. No class where a function works.
+- Tunable numbers live in one named constant at the top of their file
+  (`RATING_WEIGHTS`, `SOLVE_TIME_LIMIT_S`). Do not scatter them.
+- Deliberate shortcuts get a `ponytail:` comment naming the ceiling and the
+  upgrade path, so the next person knows it was a choice.
+- Error messages are plain English aimed at a staff member, not a developer.
+  "Session 'Robotics' has no matching column in StudentResponses.csv" — not
+  "KeyError: robotics".
+
+## Tests
+
+```
+npm test
+```
+
+`node:test` + `node:assert`, run against `tests/fixtures/`. No framework, no
+fixtures-as-code, no mocks.
+
+- `tests/invariants.test.js` — the scheduling invariants from the spec, checked
+  on every solve result. Add to `checkInvariants()` rather than writing a new
+  bespoke assertion.
+- `tests/validation.test.js` — one case per input-validation bullet in the spec.
+  Each gets a fixture file and asserts on the exact error/warning.
+- `tests/output.test.js` — mail-merge columns, zip naming, unplaced CSV.
+
+When you change the solver, the invariants test is what proves you did not break
+it. When you add a validation rule, it needs a fixture.
+
+## Deploying
+
+Push to `main`. `.github/workflows/pages.yml` uploads the repo root to GitHub
+Pages as-is. There is nothing to build, so there is nothing to break. Enable
+Pages once, with source "GitHub Actions".
+
+## If things go wrong
+
+Last resort, reach the main developer: Benjamin Clark, b1j2754@gmail.com.

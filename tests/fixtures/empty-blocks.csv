@@ -1,0 +1,6 @@
+Session Name,Session Organizer Name,Session Organizer Contact Email Address,Location,Max Students Per Session,Blocks,Length of Session (in blocks),Can be Randomly Assigned?
+The name,The adult,Contact,Room,Per run,Start blocks,1 to 4,Yes or No
+Solo,Dana Reed,dana.reed@example.org,Field,3,,1,Yes
+Duo,Lee Park,lee.park@example.org,Room 12,3,,2,Yes
+Trio,Sam Cole,sam.cole@example.org,Room 14,3,,3,Yes
+Quad,Kim Vale,kim.vale@example.org,Room 3,3,,4,Yes

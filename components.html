@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UI Components</title>
+<meta name="description" content="Every component in the Unity Day Planner's UI library, rendered.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;550;600;650;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/components.css">
+<script>
+  try { document.documentElement.dataset.theme = localStorage.getItem('theme') || 'dark'; } catch {}
+</script>
+<style>
+  /* Page scaffolding for this reference page only. Not part of the library. */
+  .spec { display: grid; gap: var(--s-3); }
+  .spec > .h3 { margin: 0; }
+  .spec code { font-family: var(--mono); font-size: 12.5px; color: var(--text-soft); }
+</style>
+</head>
+<body>
+<main class="page stack" style="gap:var(--s-5)">
+
+  <header class="row">
+    <div>
+      <h1 class="title">UI Components</h1>
+      <p class="subtitle">Everything in <code class="mono">css/components.css</code>. Clone from here; never
+        delete, only add.</p>
+    </div>
+    <button class="toggle row-end" id="theme" type="button">
+      <span class="icon icon-sm" id="theme-icon">dark_mode</span><span id="theme-label">Dark</span>
+    </button>
+  </header>
+
+  <section class="card stack">
+    <div class="card-head"><span class="step-num">1</span><h2 class="h2">Type &amp; layout</h2></div>
+    <div class="spec">
+      <h1 class="title">Title <code>.title</code></h1>
+      <p class="subtitle">Subtitle <code>.subtitle</code></p>
+      <h2 class="h2">Section heading <code>.h2</code></h2>
+      <h3 class="h3">Small heading <code>.h3</code></h3>
+      <p class="hint">Hint text <code>.hint</code> &mdash; for anything explanatory.</p>
+      <p class="hint faint">Faint <code>.faint</code> &middot; <span class="mono">mono .mono</span></p>
+      <p class="hint"><code>.row</code> lays things out in a line, <code>.row-end</code> pushes one to the
+        right, <code>.stack</code> and <code>.stack-sm</code> stack them.</p>
+    </div>
+  </section>
+
+  <section class="card stack">
+    <div class="card-head"><span class="step-num">2</span><h2 class="h2">Buttons</h2></div>
+    <div class="row">
+      <button class="btn btn-primary"><span class="icon icon-sm">auto_awesome</span>Primary</button>
+      <button class="btn">Default</button>
+      <button class="btn btn-ghost"><span class="icon icon-sm">refresh</span>Ghost</button>
+      <button class="btn btn-danger"><span class="icon icon-sm">delete</span>Danger</button>
+      <button class="btn" disabled>Disabled</button>
+    </div>
+    <div class="row">
+      <button class="btn btn-sm">Small</button>
+      <button class="btn btn-sm btn-primary">Small primary</button>
+      <button class="btn btn-icon" title="Icon only"><span class="icon icon-sm">download</span></button>
+      <button class="btn btn-primary"><span class="spinner"></span>Working&hellip;</button>
+      <button class="toggle"><span class="icon icon-sm">dark_mode</span>Toggle</button>
+      <a class="btn btn-sm" href="templates/Sessions.csv" download><span class="icon icon-sm">table</span>Link</a>
+    </div>
+    <p class="hint"><code>.btn</code> with <code>.btn-primary</code> / <code>.btn-ghost</code> /
+      <code>.btn-danger</code> / <code>.btn-sm</code> / <code>.btn-icon</code>. <code>.toggle</code> is the
+      pill. <code>.spinner</code> drops into any of them. <code>.btn</code> works on an
+      <code>&lt;a download&gt;</code> as well as a <code>&lt;button&gt;</code>.</p>
+    <div class="stack-sm">
+      <p class="hint"><code>.btn-row</code> keeps a set that belongs together on one line, scrolling
+        sideways instead of wrapping &mdash; a button on a second line gets missed:</p>
+      <div class="btn-row">
+        <button class="btn btn-sm"><span class="icon icon-sm">table</span>Sessions</button>
+        <button class="btn btn-sm"><span class="icon icon-sm">table</span>Student responses</button>
+        <button class="btn btn-sm"><span class="icon icon-sm">table</span>Non-respondents</button>
+        <button class="btn btn-sm"><span class="icon icon-sm">table</span>Overrides</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card stack">
+    <div class="card-head"><span class="step-num">3</span><h2 class="h2">Fields</h2></div>
+    <div class="row" style="align-items:flex-end">
+      <div class="field" style="flex:1 1 200px">
+        <label class="label" for="c-text">Text input</label>
+        <input class="input" id="c-text" placeholder="Start typing&hellip;">
+      </div>
+      <div class="field" style="flex:1 1 170px">
+        <label class="label" for="c-select">Dropdown</label>
+        <select class="select" id="c-select"><option>Pin</option><option>Exclude</option><option>Free</option></select>
+      </div>
+      <div class="field" style="flex:1 1 150px">
+        <label class="label" for="c-dis">Disabled</label>
+        <input class="input" id="c-dis" value="Not editable" disabled>
+      </div>
+    </div>
+    <p class="hint"><code>.field</code> wraps a <code>.label</code> and an <code>.input</code> or
+      <code>.select</code>. Both native controls are fully restyled.</p>
+  </section>
+
+  <section class="card stack">
+    <div class="card-head"><span class="step-num">4</span><h2 class="h2">Drop zones</h2></div>
+    <label class="drop">
+      <span class="icon">upload_file</span>
+      <span class="drop-text">
+        <span class="drop-name">Waiting <code>.drop</code></span>
+        <span class="drop-note">Drop a file here, or click to pick one.</span>
+      </span>
+      <input type="file">
+    </label>
+    <label class="drop is-ok">
+      <span class="icon">check_circle</span>
+      <span class="drop-text">
+        <span class="drop-name">Accepted <code>.is-ok</code></span>
+        <span class="drop-note">6 sessions</span>
+      </span>
+      <input type="file">
+    </label>
+    <label class="drop is-bad">
+      <span class="icon">error</span>
+      <span class="drop-text">
+        <span class="drop-name">Rejected <code>.is-bad</code></span>
+        <span class="drop-note">Sessions row 4: "Max Students Per Session" must be a whole number above zero.</span>
+      </span>
+      <input type="file">
+    </label>
+    <p class="hint"><code>.is-over</code> is the same as <code>.is-ok</code>'s highlight, applied while a file
+      is dragged over.</p>
+  </section>
+
+  <section class="card stack">
+    <div class="card-head"><span class="step-num">5</span><h2 class="h2">Badges</h2></div>
+    <div class="row">
+      <span class="badge">Plain</span>
+      <span class="badge badge-accent">12 overrides</span>
+      <span class="badge badge-good"><span class="icon icon-sm">check</span>Ready</span>
+      <span class="badge badge-warn">3 warnings</span>
+      <span class="badge badge-bad">2 unplaced</span>
+    </div>
+  </section>
+
+  <section class="card stack">
+    <div class="card-head"><span class="step-num">6</span><h2 class="h2">Notices</h2></div>
+    <div class="notice">
+      <span class="icon">lock</span>
+      <div class="notice-body">Plain <code>.notice</code>. Nothing is uploaded anywhere.</div>
+    </div>
+    <div class="notice notice-good">
+      <span class="icon">check_circle</span>
+      <div class="notice-body"><div class="h3">Every student has a full schedule.</div></div>
+    </div>
+    <div class="notice notice-warn">
+      <span class="icon">warning</span>
+      <div class="notice-body">
+        <div class="h3">2 things to know</div>
+        <ul class="notice-list">
+          <li>ada.byron@example.edu answered the survey more than once; keeping the latest submission.</li>
+          <li>Ignoring unrecognised Sessions column "Notes".</li>
+        </ul>
+      </div>
+    </div>
+    <div class="notice notice-bad">
+      <span class="icon">error</span>
+      <div class="notice-body">
+        <div class="h3">1 problem</div>
+        <ul class="notice-list">
+          <li>Session "Robotics Demo" has no matching column in the student responses file.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="card stack">
+    <div class="card-head"><span class="step-num">7</span><h2 class="h2">Metrics</h2></div>
+    <div class="metrics">
+      <div class="metric"><div class="metric-value">98.4%</div><div class="metric-label">Fully scheduled</div></div>
+      <div class="metric"><div class="metric-value">4.31</div><div class="metric-label">Average rating received</div></div>
+      <div class="metric"><div class="metric-value">87%</div><div class="metric-label">Assignments rated 4 or 5</div></div>
+      <div class="metric"><div class="metric-value">41</div><div class="metric-label">Non-respondents placed</div></div>
+      <div class="metric"><div class="metric-value">6</div><div class="metric-label">Overrides applied</div></div>
+    </div>
+  </section>
+
+  <section class="card stack">
+    <div class="card-head"><span class="step-num">8</span><h2 class="h2">Tables</h2></div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Block</th><th>Session</th><th>Location</th><th>Run by</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>A&ndash;C</td><td>Robotics Demo</td><td>Lab 2</td><td class="faint">Ria Shah</td>
+            <td><div class="row" style="gap:var(--s-2)">
+              <button class="btn btn-sm">Keep this</button>
+              <button class="btn btn-sm btn-danger">Not this</button>
+            </div></td></tr>
+          <tr><td>D</td><td>Free</td><td>&mdash;</td><td class="faint">&mdash;</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Student</th><th>Type</th></tr></thead>
+        <tbody><tr><td class="table-empty" colspan="2">Empty state <code>.table-empty</code></td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card stack">
+    <div class="card-head"><span class="step-num">9</span><h2 class="h2">Disclosure</h2></div>
+    <details class="disclosure">
+      <summary class="btn btn-sm"><span class="icon icon-sm">checklist</span>Show every problem</summary>
+      <div class="stack disclosure-body" style="gap:var(--s-3)">
+        <div class="notice notice-bad">
+          <span class="icon">error</span>
+          <div class="notice-body">
+            <div class="h3">sessions.csv &mdash; 2 problems</div>
+            <ul class="notice-list">
+              <li>Sessions row 4: "Max Students Per Session" must be a whole number above zero, got "zero".</li>
+              <li>Sessions row 7: "Blocks" lists the same letter twice ("AA").</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </details>
+    <p class="hint">Native <code>&lt;details&gt;</code> with <code>.disclosure</code>; the
+      <code>&lt;summary&gt;</code> takes <code>.btn</code> and the contents go in
+      <code>.disclosure-body</code>. No JavaScript involved.</p>
+  </section>
+
+  <section class="card stack">
+    <div class="card-head"><span class="step-num">10</span><h2 class="h2">Cards &amp; dividers</h2></div>
+    <p class="hint">This page is made of <code>.card</code> with a <code>.card-head</code> and a
+      <code>.step-num</code>. A card with <code>aria-disabled="true"</code> dims and stops taking input.
+      <code>.divider</code> separates sections inside one:</p>
+    <hr class="divider">
+    <div class="card" aria-disabled="true" style="box-shadow:none">
+      <div class="card-head"><span class="step-num">3</span><h2 class="h2">Not yet</h2></div>
+      <p class="hint">Disabled card.</p>
+    </div>
+  </section>
+
+  <footer class="hint" style="text-align:center"><a href="index.html" style="color:inherit">Back to the planner</a></footer>
+</main>
+
+<script>
+  const btn = document.getElementById('theme');
+  const paint = () => {
+    const dark = document.documentElement.dataset.theme === 'dark';
+    document.getElementById('theme-icon').textContent = dark ? 'light_mode' : 'dark_mode';
+    document.getElementById('theme-label').textContent = dark ? 'Light' : 'Dark';
+  };
+  btn.onclick = () => {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('theme', next); } catch {}
+    paint();
+  };
+  paint();
+</script>
+</body>
+</html>

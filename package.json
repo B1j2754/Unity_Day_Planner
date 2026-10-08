@@ -1,0 +1,18 @@
+{
+  "name": "unity-day-planner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Assigns students to Unity Day sessions. Static site, runs entirely in the browser.",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.js\"",
+    "start": "node --run serve",
+    "serve": "npx --yes http-server . -p 8080 -c-1",
+    "vendor": "cp node_modules/highs/build/highs.mjs node_modules/highs/build/highs.wasm vendor/ && cp node_modules/xlsx/dist/xlsx.full.min.js vendor/xlsx.min.js && cp node_modules/fflate/umd/index.js vendor/fflate.min.js"
+  },
+  "devDependencies": {
+    "fflate": "^0.8.2",
+    "highs": "^1.15.3",
+    "xlsx": "^0.18.5"
+  }
+}

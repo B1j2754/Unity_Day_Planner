@@ -1,0 +1,7 @@
+Session Name,Session Organizer Name,Session Organizer Contact Email Address,Location,Max Students Per Session,Blocks,Length of Session (in blocks),Can be Randomly Assigned?,Notes
+The name,The adult,Contact,Room,Per run,Start blocks,1 to 4,Yes or No,Extra
+Archery,Dana Reed,dana.reed@example.org,Field,zero,,1,Yes,
+Art,Lee Park,not-an-email,Room 12,3,AA,1,Yes,
+Art History,Sam Cole,sam.cole@example.org,Room 14,3,BC,2,Yes,
+Chess Club,Kim Vale,kim.vale@example.org,Room 3,3,,9,Yes,
+Pottery,Alex Fox,,Art Room,3,AX,1,maybe,
