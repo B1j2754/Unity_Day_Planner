@@ -232,7 +232,7 @@ A simple table of the current overrides (loaded from Overrides.csv if uploaded, 
 
 ## Output
 
-3 Outputs are required
+5 outputs are required: three for students, two for the adults running sessions
 
 1. Power-Automate-acceptable output
     * One file output: `unity-day_mail-merge.xlsx`
@@ -249,7 +249,29 @@ A simple table of the current overrides (loaded from Overrides.csv if uploaded, 
     * Each PNG file must be named `first.last@example.edu.png` or whatever the email is, plus `.png`
     * > **Clarification:** Includes non-respondents; excludes unplaced students.
 
-3. Unplaced Students
+3. Staff mail merge
+    * One file output: `unity-day_staff-mail-merge.xlsx`
+    * One row per __organizer__, not per session. Everything one adult runs all day lands in a single row, so they get one email rather than one per session. Keyed on "Session Organizer Contact Email Address".
+    * Columns:
+        * "Email": the organizer's email
+        * "Name": the organizer's name, as written in Sessions.csv
+        * "Roster_HTML": their whole day as an HTML table, one section per run, each listing the students placed in it
+        * "Sessions": the session names they run, comma separated, plain text
+        * "Blocks": the blocks they are running in, e.g. `A, C, D`, plain text
+        * "Student_Count": how many students they see across the day, as a number
+    * The last three are plain text so the Power Automate flow can put real detail in the subject line without having to read the HTML
+    * > **Clarification:** This is a second flow, separate from the student one. The file name and all six column names are a fixed contract with it.
+    * > **Clarification:** A session whose organizer has no email is skipped, with no warning. There is nowhere to send the roster and nothing to name the file after. Staff who need one without an email should be given it by hand.
+
+4. Roster PNG Zip File
+    * One file output: `unity-day_rosters.zip`
+    * One PNG per organizer, named `<organizer email>.png`, matching the staff mail merge row for row
+    * Each roster shows, for the whole day: the organizer's name and email, how many runs and students they have, and which blocks they are free
+    * Then one section per run, in block order, headed with the block, session name and location, and showing how full it is (e.g. `3 of 20`)
+    * Each section lists its students numbered, surname first, with preferred name, grade and email
+    * A run with nobody in it is still listed, saying so — an empty room is something the adult standing in it needs to know about
+
+5. Unplaced Students
     * Shown on screen as an error, and downloadable as `unity-day_unplaced.csv`
     * One row per student who could not be fully scheduled or whose row was rejected, with columns: "Email", "Name", "Grade", "Reason" (e.g. `Blank rating for "Robotics Demo"`, `No open seat in block C`), and "Partial Schedule" (whatever blocks were filled, if any)
     * Staff use this list to place these students by hand
@@ -316,4 +338,8 @@ Input validation (each has a fixture file with the expected error/warning):
 Output:
 * Mail-merge xlsx has exactly the columns `Email`, `Name`, `Schedule_HTML`, one row per scheduled student.
 * Zip contains one PNG per scheduled student, named `<email>.png`.
+* Staff mail-merge xlsx has exactly the columns `Email`, `Name`, `Roster_HTML`, `Sessions`, `Blocks`, `Student_Count`, one row per organizer email.
+* Roster zip contains one PNG per organizer email, named `<email>.png`.
+* A roster lists exactly the students the solver placed in that run, no more and no fewer, and keeps runs that came out empty.
+* An organizer with no email appears in neither staff output.
 * A deliberately over-subscribed fixture still produces outputs for everyone who fits, and lists the rest in Unplaced Students.

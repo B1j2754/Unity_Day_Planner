@@ -8,7 +8,9 @@ import {
 } from './parse.js';
 import {
   MAIL_MERGE_FILE, MAIL_MERGE_COLUMNS, UNPLACED_FILE, PNG_ZIP_FILE,
+  STAFF_MAIL_MERGE_FILE, STAFF_MAIL_MERGE_COLUMNS, ROSTER_ZIP_FILE,
   mailMergeRows, unplacedRows, scheduleRows, toCSV, drawSchedule,
+  rosters, staffMailMergeRows, drawRoster,
 } from './output.js';
 
 const $ = sel => document.querySelector(sel);
@@ -550,32 +552,42 @@ function download(name, data, type = 'text/csv;charset=utf-8') {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
-$('#dl-merge').onclick = () => {
-  const rows = mailMergeRows(orderedStudents(), state.result.assignments, state.sessions);
-  const ws = XLSX.utils.json_to_sheet(rows, { header: MAIL_MERGE_COLUMNS });
+function downloadXlsx(name, rows, columns) {
+  const ws = XLSX.utils.json_to_sheet(rows, { header: columns });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'MailMerge');
   const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  download(MAIL_MERGE_FILE, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  download(name, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+}
+
+$('#dl-merge').onclick = () => {
+  downloadXlsx(MAIL_MERGE_FILE, mailMergeRows(orderedStudents(), state.result.assignments, state.sessions), MAIL_MERGE_COLUMNS);
+};
+
+const organizerRosters = () => rosters(orderedStudents(), state.result.assignments, state.sessions);
+
+$('#dl-staff-merge').onclick = () => {
+  downloadXlsx(STAFF_MAIL_MERGE_FILE, staffMailMergeRows(organizerRosters()), STAFF_MAIL_MERGE_COLUMNS);
 };
 
 $('#dl-unplaced').onclick = () => {
   download(UNPLACED_FILE, toCSV(unplacedRows(state.result.unplaced, state.rejected, state.sessions)));
 };
 
-$('#dl-pngs').onclick = async () => {
-  const btn = $('#dl-pngs');
-  const students = orderedStudents().filter(s => state.result.assignments.has(s.email));
+/**
+ * Draws one PNG per item and zips them. `draw` gets a reused canvas and must
+ * return the file name to store it under.
+ */
+async function downloadPngZip(btn, zipName, items, noun, draw) {
   btn.disabled = true;
   const canvas = document.createElement('canvas');
   const files = {};
-  for (let i = 0; i < students.length; i++) {
-    const s = students[i];
-    drawSchedule(canvas, s, scheduleRows(state.result.assignments.get(s.email), state.sessions));
+  for (let i = 0; i < items.length; i++) {
+    const name = draw(canvas, items[i]);
     const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    files[`${s.email}.png`] = new Uint8Array(await blob.arrayBuffer());
+    files[name] = new Uint8Array(await blob.arrayBuffer());
     if (i % 20 === 0) {
-      $('#download-hint').textContent = `Drawing schedules… ${i + 1} of ${students.length}`;
+      $('#download-hint').textContent = `Drawing ${noun}… ${i + 1} of ${items.length}`;
       await new Promise(requestAnimationFrame);
     }
   }
@@ -583,10 +595,22 @@ $('#dl-pngs').onclick = async () => {
   // ponytail: store, no deflate. PNGs are already compressed, and zipping 1000
   // of them with deflate just burns a few seconds for ~1% off the file.
   const zip = fflate.zipSync(files, { level: 0 });
-  download(PNG_ZIP_FILE, new Blob([zip], { type: 'application/zip' }));
-  $('#download-hint').textContent = `${students.length} schedule images.`;
+  download(zipName, new Blob([zip], { type: 'application/zip' }));
+  $('#download-hint').textContent = `${items.length} ${noun}.`;
   btn.disabled = false;
+}
+
+$('#dl-pngs').onclick = () => {
+  const students = orderedStudents().filter(s => state.result.assignments.has(s.email));
+  return downloadPngZip($('#dl-pngs'), PNG_ZIP_FILE, students, 'schedule images', (canvas, s) => {
+    drawSchedule(canvas, s, scheduleRows(state.result.assignments.get(s.email), state.sessions));
+    return `${s.email}.png`;
+  });
 };
+
+$('#dl-rosters').onclick = () => downloadPngZip(
+  $('#dl-rosters'), ROSTER_ZIP_FILE, organizerRosters(), 'rosters',
+  (canvas, org) => { drawRoster(canvas, org); return `${org.email}.png`; });
 
 /** Stable output order, so two runs produce byte-identical files. */
 const orderedStudents = () => [...state.students].sort((a, b) => (key(a.email) < key(b.email) ? -1 : 1));

@@ -1,12 +1,18 @@
-// Assignments -> the three deliverables. The mail-merge file name and its three
-// column names are a frozen contract with the Outlook Power Automate flow.
+// Assignments -> the deliverables. Two sets: what each student gets, and what
+// each adult running a session gets. Both mail-merge file names and all of
+// their column names are a contract with an Outlook Power Automate flow, which
+// looks the values up by column name — renaming one breaks that flow.
 
-import { BLOCKS } from './parse.js';
+import { BLOCKS, key } from './parse.js';
 
 export const MAIL_MERGE_FILE = 'unity-day_mail-merge.xlsx';
 export const MAIL_MERGE_COLUMNS = ['Email', 'Name', 'Schedule_HTML'];
 export const UNPLACED_FILE = 'unity-day_unplaced.csv';
 export const PNG_ZIP_FILE = 'unity-day_schedules.zip';
+
+export const STAFF_MAIL_MERGE_FILE = 'unity-day_staff-mail-merge.xlsx';
+export const STAFF_MAIL_MERGE_COLUMNS = ['Email', 'Name', 'Roster_HTML', 'Sessions', 'Blocks', 'Student_Count'];
+export const ROSTER_ZIP_FILE = 'unity-day_rosters.zip';
 
 /**
  * One line per slot, consecutive blocks of a multi-block session merged.
@@ -74,6 +80,111 @@ export function toCSV(rows) {
   return [cols.join(','), ...rows.map(r => cols.map(c => q(r[c])).join(','))].join('\r\n') + '\r\n';
 }
 
+// --------------------------------------------------------------- Rosters
+
+/** "Byron, Ada" — how a register reads. A one-word name is left alone. */
+export function listedName(fullName) {
+  const bits = String(fullName ?? '').trim().split(/\s+/).filter(Boolean);
+  if (bits.length < 2) return bits[0] || '';
+  return `${bits[bits.length - 1]}, ${bits.slice(0, -1).join(' ')}`;
+}
+
+const byListedName = (a, b) => {
+  const [x, y] = [listedName(a.fullName), listedName(b.fullName)].map(key);
+  if (x !== y) return x < y ? -1 : 1;
+  return key(a.email) < key(b.email) ? -1 : 1;
+};
+
+/**
+ * One roster per organizer, covering everything they run all day.
+ *
+ * Keyed on the organizer's email, because that is what the mail merge sends to
+ * and what names the image file. A session with no organizer email is skipped:
+ * there is nowhere to send it and nothing to call the file.
+ *
+ * Runs with nobody in them are kept — an empty room is something the adult
+ * standing in it needs to know about.
+ */
+export function rosters(students, assignments, sessions) {
+  const inRun = new Map();                       // "session|start" -> students
+  for (const st of [...students].sort(byListedName)) {
+    const got = assignments.get(st.email);
+    if (!got) continue;
+    for (const slot of new Set(got.values())) {
+      const k = `${slot.sessionIndex}|${slot.start}`;
+      if (!inRun.has(k)) inRun.set(k, []);
+      inRun.get(k).push(st);
+    }
+  }
+
+  const byOrganizer = new Map();
+  sessions.forEach((session, si) => {
+    if (!session.email) return;
+    const k = key(session.email);
+    if (!byOrganizer.has(k)) {
+      byOrganizer.set(k, { email: session.email, name: session.organizer || session.email, runs: [] });
+    }
+    for (const start of session.starts) {
+      byOrganizer.get(k).runs.push({
+        session, start,
+        blocks: Array.from({ length: session.length }, (_, i) => start + i),
+        students: inRun.get(`${si}|${start}`) || [],
+      });
+    }
+  });
+
+  return [...byOrganizer.values()]
+    .sort((a, b) => (key(a.email) < key(b.email) ? -1 : 1))
+    .map(org => {
+      org.runs.sort((a, b) => a.start - b.start || (key(a.session.name) < key(b.session.name) ? -1 : 1));
+      const busy = new Set(org.runs.flatMap(r => r.blocks));
+      return {
+        ...org,
+        free: BLOCKS.map((_, b) => b).filter(b => !busy.has(b)),
+        studentCount: org.runs.reduce((n, r) => n + r.students.length, 0),
+        sessionNames: [...new Set(org.runs.map(r => r.session.displayName || r.session.name))],
+      };
+    });
+}
+
+/** "A", or "A–B" for a run that spans blocks. */
+const blockLabel = run => (run.blocks.length > 1
+  ? `${BLOCKS[run.blocks[0]]}–${BLOCKS[run.blocks[run.blocks.length - 1]]}`
+  : BLOCKS[run.blocks[0]]);
+
+const runTitle = run => [
+  `Block ${blockLabel(run)}`,
+  run.session.displayName || run.session.name,
+  run.session.location,
+].filter(Boolean).join(' · ');
+
+export function rosterHTML(org) {
+  const td = (v, extra = '') => `<td style="border:1px solid #ccc;padding:5px 10px;${extra}">${esc(v)}</td>`;
+  const sections = org.runs.map(run => {
+    const head = `<tr><td colspan="4" style="border:1px solid #ccc;padding:7px 10px;background:#f4f4f4;font-weight:bold;">${esc(runTitle(run))} &mdash; ${run.students.length} of ${run.session.capacity}</td></tr>`;
+    if (!run.students.length) {
+      return head + `<tr>${td('No students in this one.', 'color:#767676;')}<td colspan="3" style="border:1px solid #ccc;"></td></tr>`;
+    }
+    const cols = `<tr>${['Student', 'Goes by', 'Grade', 'Email'].map(h => `<td style="border:1px solid #ccc;padding:4px 10px;font-size:12px;color:#555;">${h}</td>`).join('')}</tr>`;
+    const rows = run.students.map(s =>
+      `<tr>${td(listedName(s.fullName))}${td(s.name)}${td(s.grade || '—')}${td(s.email)}</tr>`).join('');
+    return head + cols + rows;
+  }).join('');
+  return `<table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;"><tbody>${sections}</tbody></table>`;
+}
+
+/** One row per organizer, for the staff Power Automate flow. */
+export function staffMailMergeRows(orgs) {
+  return orgs.map(org => ({
+    Email: org.email,
+    Name: org.name,
+    Roster_HTML: rosterHTML(org),
+    Sessions: org.sessionNames.join(', '),
+    Blocks: [...new Set(org.runs.flatMap(r => r.blocks))].sort((a, b) => a - b).map(b => BLOCKS[b]).join(', '),
+    Student_Count: org.studentCount,
+  }));
+}
+
 // ------------------------------------------------------------------- PNG
 
 const PNG = {
@@ -131,5 +242,87 @@ export function drawSchedule(canvas, student, rows) {
   });
   c.strokeStyle = '#d4d4d8';
   c.strokeRect(pad + 0.5, headerH + 0.5, tableW - 1, headH + rows.length * rowH - 1);
+  return canvas;
+}
+
+const ROSTER = { w: 900, pad: 36, headerH: 104, barH: 38, colH: 26, rowH: 30, gap: 18 };
+
+/** Draws one organizer's whole day as a register. Browser only. */
+export function drawRoster(canvas, org) {
+  const { w, pad, headerH, barH, colH, rowH, gap } = ROSTER;
+  const { font } = PNG;
+  const tableW = w - pad * 2;
+  const bodyH = org.runs.reduce((h, r) => h + barH + colH + Math.max(r.students.length, 1) * rowH + gap, 0);
+  canvas.width = w;
+  canvas.height = headerH + bodyH + pad - gap;
+  const c = canvas.getContext('2d');
+
+  c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, canvas.height);
+  c.fillStyle = '#111111';
+  c.font = `700 30px ${font}`;
+  c.fillText(`Unity Day Roster — ${org.name}`, pad, 52);
+  c.font = `400 16px ${font}`;
+  c.fillStyle = '#555555';
+  c.fillText([
+    org.email,
+    `${org.runs.length} ${org.runs.length === 1 ? 'run' : 'runs'}`,
+    `${org.studentCount} ${org.studentCount === 1 ? 'student' : 'students'}`,
+    org.free.length ? `free in ${org.free.map(b => BLOCKS[b]).join(', ')}` : 'running all four blocks',
+  ].join('  ·  '), pad, 82);
+
+  // ponytail: fixed columns, clipped per cell. Long emails are the only thing
+  // likely to run over; widen the email column if that ever bites.
+  const cols = [
+    { x: pad + 10, w: 44, key: r => r.n },
+    { x: pad + 54, w: 230, key: r => listedName(r.s.fullName) },
+    { x: pad + 284, w: 140, key: r => r.s.name },
+    { x: pad + 424, w: 70, key: r => r.s.grade || '—' },
+    { x: pad + 494, w: tableW - 504, key: r => r.s.email },
+  ];
+  const labels = ['#', 'Student', 'Goes by', 'Grade', 'Email'];
+  let y = headerH;
+
+  for (const run of org.runs) {
+    c.fillStyle = '#eef2ff'; c.fillRect(pad, y, tableW, barH);
+    c.fillStyle = '#1d4ed8'; c.font = `650 16px ${font}`;
+    c.save();
+    c.beginPath(); c.rect(pad, y, tableW - 110, barH); c.clip();
+    c.fillText(runTitle(run), pad + 12, y + 25);
+    c.restore();
+    c.font = `600 14px ${font}`;
+    const count = `${run.students.length} of ${run.session.capacity}`;
+    c.fillText(count, pad + tableW - 12 - c.measureText(count).width, y + 25);
+    y += barH;
+
+    c.fillStyle = '#f4f4f5'; c.fillRect(pad, y, tableW, colH);
+    c.fillStyle = '#52525b'; c.font = `600 11.5px ${font}`;
+    cols.forEach((col, i) => c.fillText(labels[i].toUpperCase(), col.x, y + 17));
+    y += colH;
+
+    if (!run.students.length) {
+      c.fillStyle = '#8b8b94'; c.font = `400 15px ${font}`;
+      c.fillText('No students in this one.', pad + 12, y + 20);
+      y += rowH;
+    }
+    run.students.forEach((s, i) => {
+      if (i % 2) { c.fillStyle = '#fafafa'; c.fillRect(pad, y, tableW, rowH); }
+      c.strokeStyle = '#ececef'; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(pad, y + 0.5); c.lineTo(pad + tableW, y + 0.5); c.stroke();
+      for (const col of cols) {
+        c.fillStyle = col === cols[0] ? '#a1a1aa' : '#27272a';
+        c.font = `400 14.5px ${font}`;
+        c.save();
+        c.beginPath(); c.rect(col.x, y, col.w, rowH); c.clip();
+        c.fillText(String(col.key({ n: i + 1, s })), col.x, y + 20);
+        c.restore();
+      }
+      y += rowH;
+    });
+
+    c.strokeStyle = '#d4d4d8';
+    c.strokeRect(pad + 0.5, y - Math.max(run.students.length, 1) * rowH - colH - barH + 0.5,
+      tableW - 1, barH + colH + Math.max(run.students.length, 1) * rowH - 1);
+    y += gap;
+  }
   return canvas;
 }

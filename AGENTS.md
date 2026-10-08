@@ -20,9 +20,11 @@ Pages straight from the repo root.
    real export in here, it does not get committed.
 3. **No build step.** Plain ES modules, relative paths, no bundler, no
    transpile. If you reach for a bundler, you have taken a wrong turn.
-4. **The Power Automate contract is frozen.** `unity-day_mail-merge.xlsx`,
-   columns `Email` / `Name` / `Schedule_HTML`. Changing any of those four
-   strings breaks a live Outlook flow.
+4. **The Power Automate contracts are frozen.** Two flows, two files:
+   `unity-day_mail-merge.xlsx` with `Email` / `Name` / `Schedule_HTML` for
+   students, and `unity-day_staff-mail-merge.xlsx` with `Email` / `Name` /
+   `Roster_HTML` / `Sessions` / `Blocks` / `Student_Count` for the adults
+   running sessions. Changing any of those strings breaks a live Outlook flow.
 5. **Determinism.** Same inputs, same bytes out. All randomness is seeded
    (`js/solve.js` `hash()`), ties break on sorted email, HiGHS runs with
    `random_seed` fixed and zero MIP gap. Row order of an input file must never

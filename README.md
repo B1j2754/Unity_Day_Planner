@@ -20,6 +20,10 @@ no server and no database. Close the tab and nothing is kept.
 5. Download:
    - `unity-day_mail-merge.xlsx` — feed this to the Outlook Power Automate flow.
    - `unity-day_schedules.zip` — one PNG per student, named after their email.
+   - `unity-day_staff-mail-merge.xlsx` — the same idea for the adults running
+     sessions, one row each, with their roster. Needs its own flow.
+   - `unity-day_rosters.zip` — one PNG per organizer: every run they have, who
+     is in it, and which blocks they are free.
    - `unity-day_unplaced.csv` — anyone who needs placing by hand.
    - `Overrides.csv` — **download this if you made any overrides.** The page
      keeps nothing between visits, so this file is the only way to get the same

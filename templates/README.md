@@ -24,7 +24,7 @@ skips it. Your sessions start on row 3.
 |---|---|
 | Session Name | Exactly as it should read on student schedules. Must match the start of that session's column in the responses file. |
 | Session Organizer Name | The main adult running it. Any spelling. |
-| Session Organizer Contact Email Address | Point of contact. Leave blank to keep any mention of an email off the schedules. |
+| Session Organizer Contact Email Address | Point of contact. Also what the staff roster and staff mail merge are keyed on, so **an organizer with no email here gets no roster at all**. Leave blank only if you intend to hand them one yourself. |
 | Location | Room number, or any instruction you want printed. |
 | Max Students Per Session | Whole number above zero. **Per run, not per day** — a session in blocks A and C with capacity 20 holds 20 students in A and 20 different students in C. |
 | Blocks | The letters a run *starts* in, e.g. `AC`. One run per letter. Leave blank for the default below. |
