@@ -1,6 +1,14 @@
 # Deploys the repo root to GitHub Pages. There is no build step: the site is
 # plain HTML, ES modules and the committed vendor/ libraries.
-# Enable once in Settings > Pages, with source "GitHub Actions".
+#
+# ONE-TIME SETUP, REQUIRED BEFORE THE FIRST RUN:
+#   Settings > Pages > Build and deployment > Source: "GitHub Actions"
+#
+# Without it, configure-pages below fails with "Get Pages site failed ...
+# Not Found". That cannot be automated here: the action's `enablement: true`
+# option needs administration:write, which the built-in GITHUB_TOKEN is not
+# allowed to have, so it would need a personal access token. Clicking the
+# setting once is less machinery than maintaining a PAT.
 name: Deploy to GitHub Pages
 
 on:

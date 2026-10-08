@@ -53,9 +53,21 @@ no build step, no backend, nothing leaves the browser, and
 
 ## Deploying
 
-Push to `main`. `.github/workflows/pages.yml` runs the tests and publishes the
-repo root to GitHub Pages. Enable it once under **Settings → Pages** with the
-source set to **GitHub Actions**.
+**First time only:** go to **Settings → Pages → Build and deployment** and set
+**Source** to **GitHub Actions**. Until you do, the workflow fails on
+`configure-pages` with *"Get Pages site failed … Not Found"*, because there is
+no Pages site for it to configure yet. The workflow cannot turn this on for
+itself — that needs `administration:write`, which the built-in token is not
+allowed to have.
+
+After that, push to `main`. `.github/workflows/pages.yml` runs the tests and
+publishes the repo root. If a run already failed, just re-run it from the
+**Actions** tab; no new commit is needed.
+
+The whole repo root is published, `tests/` and `spec_sheet.md` included. That is
+deliberate — there is no build step to separate them, and the fixtures are
+invented data. `.git` and `.github` are excluded by
+`actions/upload-pages-artifact`.
 
 ## How the matching works
 
