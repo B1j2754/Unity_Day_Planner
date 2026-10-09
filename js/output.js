@@ -374,3 +374,83 @@ export function drawRoster(canvas, org) {
   }
   return canvas;
 }
+
+// --------------------------------------------------- reading a merge back in
+//
+// The inverse of the two writers above. A finished day gets handed round as
+// those two CSVs, so the app can read one back and act as a lookup directory
+// on the day itself, with no sessions file, no survey and no solve. The reader
+// lives next to the column names it depends on so the two cannot drift apart.
+
+/**
+ * Which merge sheet is this? Decided on the long text column, the one thing
+ * the two contracts do not share.
+ * @returns {'student'|'staff'|null}
+ */
+export function sheetKind(headers = []) {
+  const h = headers.map(x => String(x ?? '').trim());
+  if (h.includes('Schedule_Text')) return 'student';
+  if (h.includes('Roster_Text')) return 'staff';
+  return null;
+}
+
+/**
+ * Rows of a downloaded merge sheet -> flat records for the lookup page.
+ * Unknown or extra columns are ignored, so a sheet someone has added a note
+ * column to still reads. Rows with no email are skipped: there is nothing to
+ * identify them by.
+ * @returns {{kind:'student'|'staff', people:object[]}}
+ */
+export function readMergeSheet(rows = []) {
+  const kind = sheetKind(rows[0] || []);
+  if (!kind) return { kind: null, people: [] };
+  const head = rows[0].map(x => String(x ?? '').trim());
+  const at = name => head.indexOf(name);
+  const get = (row, name) => {
+    const i = at(name);
+    return i === -1 ? '' : String(row[i] ?? '').trim();
+  };
+
+  const people = [];
+  for (const row of rows.slice(1)) {
+    const email = get(row, 'Email');
+    if (!email) continue;
+    const text = get(row, kind === 'student' ? 'Schedule_Text' : 'Roster_Text');
+    const meta = kind === 'student'
+      ? [['Grade', get(row, 'Grade')]]
+      : [['Sessions', get(row, 'Sessions')], ['Blocks', get(row, 'Blocks')], ['Students', get(row, 'Student_Count')]];
+    people.push({
+      kind,
+      email,
+      name: get(row, 'Full_Name') || get(row, 'Name') || email,
+      text,
+      meta: meta.filter(([, v]) => v !== ''),
+    });
+  }
+  return { kind, people };
+}
+
+/**
+ * People matching a typed query, best match first: whole email, then a name or
+ * email that starts with it, then one that merely contains it. Deliberately
+ * only matches on who someone is, not on the body of their schedule, so a
+ * search for a common word cannot return half the school.
+ */
+export function searchDirectory(people, query, limit = 25) {
+  const q = key(query);
+  if (!q) return [];
+  const rank = p => {
+    const email = key(p.email), name = key(p.name);
+    if (email === q) return 0;
+    if (name === q) return 1;
+    if (email.startsWith(q) || name.startsWith(q)) return 2;
+    if (email.includes(q) || name.includes(q)) return 3;
+    return -1;
+  };
+  return people
+    .map(p => ({ p, r: rank(p) }))
+    .filter(x => x.r >= 0)
+    .sort((a, b) => a.r - b.r || (key(a.p.name) < key(b.p.name) ? -1 : 1))
+    .slice(0, limit)
+    .map(x => x.p);
+}

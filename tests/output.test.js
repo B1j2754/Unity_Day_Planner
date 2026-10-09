@@ -1,9 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { run, scenario } from './helpers.js';
+import { parseCSV } from '../js/parse.js';
 import {
   MAIL_MERGE_COLUMNS, mailMergeRows, unplacedRows, scheduleRows, scheduleText, toCSV,
   STAFF_MAIL_MERGE_COLUMNS, rosters, rosterText, staffMailMergeRows, listedName,
+  sheetKind, readMergeSheet, searchDirectory,
 } from '../js/output.js';
 
 test('the mail merge has exactly the three contract columns, one row per scheduled student', () => {
@@ -202,3 +204,90 @@ test('a roster is an aligned register, and says when a run is empty', () => {
     }
   }
 });
+
+// ------------------------------------------- reading a merge sheet back in
+
+/** The two sheets, written and then parsed exactly as the lookup page does. */
+function roundTrip(opts = { nonrespondents: 'nonrespondents.csv' }) {
+  const r = run(opts);
+  const orgs = rosters(r.students, r.assignments, r.sessions);
+  return {
+    r,
+    student: readMergeSheet(parseCSV(toCSV(mailMergeRows(r.students, r.assignments, r.sessions)))),
+    staff: readMergeSheet(parseCSV(toCSV(staffMailMergeRows(orgs)))),
+  };
+}
+
+test('each merge sheet is recognised by its own text column', () => {
+  assert.equal(sheetKind(MAIL_MERGE_COLUMNS), 'student');
+  assert.equal(sheetKind(STAFF_MAIL_MERGE_COLUMNS), 'staff');
+  assert.equal(sheetKind(['Email', 'Name']), null);
+  assert.equal(sheetKind([]), null);
+  assert.equal(sheetKind(), null);
+  // Stray whitespace and extra columns are what a sheet looks like after
+  // someone has opened it in Excel, and must still be recognised.
+  assert.equal(sheetKind([' Schedule_Text ', 'Notes']), 'student');
+});
+
+test('a written mail merge reads back as the same people', () => {
+  const { r, student, staff } = roundTrip();
+  assert.equal(student.kind, 'student');
+  assert.equal(student.people.length, r.assignments.size);
+  assert.deepEqual(student.people.map(p => p.email).sort(), [...r.assignments.keys()].sort());
+  assert.equal(staff.kind, 'staff');
+  assert.equal(staff.people.length, rosters(r.students, r.assignments, r.sessions).length);
+});
+
+test('a read-back record carries the text and the facts worth showing', () => {
+  const { student, staff } = roundTrip();
+  const ada = student.people.find(p => p.email === 'ada.byron@example.edu');
+  assert.equal(ada.name, 'Ada Byron');
+  assert.match(ada.text, /^UNITY DAY SCHEDULE/);
+  assert.ok(ada.text.includes('BLOCK '), ada.text);
+  assert.deepEqual(ada.meta, [['Grade', '11']]);
+
+  const org = staff.people[0];
+  assert.match(org.text, /^UNITY DAY ROSTER - /);
+  assert.deepEqual(org.meta.map(([k]) => k), ['Sessions', 'Blocks', 'Students']);
+});
+
+test('rows with no email are skipped, since nothing identifies them', () => {
+  const rows = [['Email', 'Name', 'Grade', 'Schedule_Text'], ['', 'Nobody', '9', 'x'], ['a@b.c', 'Someone', '9', 'y']];
+  assert.deepEqual(readMergeSheet(rows).people.map(p => p.email), ['a@b.c']);
+});
+
+test('a sheet that is neither merge file yields nothing rather than guessing', () => {
+  const { kind, people } = readMergeSheet([['Session Name', 'Location'], ['Archery', 'Field']]);
+  assert.equal(kind, null);
+  assert.deepEqual(people, []);
+  assert.deepEqual(readMergeSheet([]), { kind: null, people: [] });
+  assert.deepEqual(readMergeSheet(), { kind: null, people: [] });
+});
+
+test('search ranks a whole email first, and caps how much it returns', () => {
+  const { student } = roundTrip();
+  const people = student.people;
+  assert.deepEqual(searchDirectory(people, 'ada.byron@example.edu').map(p => p.email), ['ada.byron@example.edu']);
+  assert.deepEqual(searchDirectory(people, 'Ada').map(p => p.email), ['ada.byron@example.edu']);
+  // A shared domain matches everybody, so the cap is what keeps the page usable.
+  assert.equal(searchDirectory(people, 'example.edu').length, people.length);
+  assert.equal(searchDirectory(people, 'example.edu', 3).length, 3);
+  assert.deepEqual(searchDirectory(people, ''), []);
+  assert.deepEqual(searchDirectory(people, '   '), []);
+  assert.deepEqual(searchDirectory(people, 'nobody at all'), []);
+});
+
+test('search never matches on the body of a schedule, only on who someone is', () => {
+  const { student } = roundTrip();
+  // "BLOCK" is in every schedule; matching it would hand back the whole school.
+  assert.deepEqual(searchDirectory(student.people, 'BLOCK'), []);
+  assert.deepEqual(searchDirectory(student.people, 'UNITY DAY'), []);
+});
+
+test('students and session leaders search as one directory', () => {
+  const { student, staff } = roundTrip();
+  const both = [...student.people, ...staff.people];
+  const kinds = new Set(searchDirectory(both, 'example', 100).map(p => p.kind));
+  assert.deepEqual([...kinds].sort(), ['staff', 'student']);
+});
+

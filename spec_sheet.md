@@ -215,6 +215,18 @@ The app is a single page with three steps, shown top to bottom:
 2. **Review & Overrides.** After clicking "Generate Schedules", show the metrics, warnings, errors, and the Overrides Editor.
 3. **Download.** Buttons for the three outputs, plus "Download Overrides".
 
+### Lookup page (`lookup.html`)
+
+A second, read-only page for the day itself, linked from the planner. Someone at a front desk opens it, drops in the two mail-merge files the planner already produced, and searches.
+
+* One drop zone takes **either or both** merge files, `.csv` only. Which file is which is decided by its text column: `Schedule_Text` means the student sheet, `Roster_Text` the staff sheet. Anything else is rejected by name with the reason.
+* Search matches on **name or email only**, never on the body of a schedule, so a common word cannot return half the school. Ranked: whole email, then whole name, then starts-with, then contains. Capped at 25.
+* A result shows the person, their email, the short facts from the sheet (grade, or sessions/blocks/student count) and their schedule or roster text exactly as the merge wrote it.
+* No solving, no sessions file, no overrides, nothing to edit. It only reads.
+* **Nothing is persisted.** The rows are real students, so they are held in memory only, never in `localStorage`, and a **Clear** button drops them for use on a shared computer.
+
+> **Clarification: why a separate page.** The planner’s own lookup is wired to a live solve and offers *Keep this* / *Not this*, which write overrides. The day-of audience has nothing to change and must not be shown a Generate button, so the two do not share code beyond `readMergeSheet` and `searchDirectory`.
+
 #### Overrides Editor
 
 A simple table of the current overrides (loaded from Overrides.csv if uploaded, otherwise empty), with the same columns as the file.

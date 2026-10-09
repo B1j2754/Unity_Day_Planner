@@ -346,3 +346,22 @@ body {
   padding: 0; margin: -1px; overflow: hidden;
   clip-path: inset(50%); white-space: nowrap;
 }
+
+/* --- preformatted sheet (lookup) ---------------------------------------- */
+
+/* A schedule or roster exactly as the mail merge writes it. Monospaced because
+   a roster is a space-aligned grid; a student schedule is stacked and does not
+   need it, but reads fine either way. */
+.sheet {
+  margin: 0;
+  padding: var(--s-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}

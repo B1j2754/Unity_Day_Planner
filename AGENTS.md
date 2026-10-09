@@ -56,6 +56,8 @@ js/parse.js        CSV text -> validated sessions / students / overrides  (pure,
 js/solve.js        validated data -> assignments                          (pure, no DOM)
 js/output.js       assignments -> merge rows, schedule/roster text, PNG, CSVs
 js/app.js          all the DOM wiring. The only file that touches the page.
+lookup.html        read-only lookup of a finished day, for the day itself
+js/lookup.js       the DOM wiring for lookup.html. Shares nothing with app.js.
 js/solver.worker.js  runs solve.js off the main thread
 vendor/            highs (WASM solver), xlsx (SheetJS), fflate (zip). Committed on purpose.
 tests/             node:test, no framework

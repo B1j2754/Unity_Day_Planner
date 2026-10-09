@@ -33,6 +33,16 @@ no server and no database. Close the tab and nothing is kept.
      keeps nothing between visits, so this file is the only way to get the same
      result next time.
 
+## On the day itself
+
+Open **[lookup.html](lookup.html)** (linked from the planner) and drop in
+`unity-day_mail-merge.csv` and `unity-day_staff-mail-merge.csv`. Search any name
+or email to see that student’s schedule or that session leader’s roster.
+
+It only reads, so there is nothing to break and nothing to re-run — safe to leave
+open at a front desk. The files are held in the tab only, never saved; press
+**Clear** when finished on a shared computer.
+
 [templates/README.md](templates/README.md) is the short guide to the input
 files. `spec_sheet.md` is the full rulebook behind it.
 
