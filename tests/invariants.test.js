@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { highs, run, scenario, says, shuffle, fixture } from './helpers.js';
 import { Report, parseSessions, parseStudents, parseNonRespondents, parseOverrides, overridesToRows } from '../js/parse.js';
-import { checkInvariants, solve } from '../js/solve.js';
+import { checkInvariants, exclusionGroups, solve } from '../js/solve.js';
 
 const WITH_EVERYTHING = { nonrespondents: 'nonrespondents.csv', overrides: 'overrides.csv' };
 
@@ -135,6 +135,57 @@ test('a Pin can put a non-respondent in a session marked No', () => {
   const r = solve({ highs, ...s, overrides, report: new Report() });
   assert.deepEqual(checkInvariants({ ...s, overrides, ...r }), []);
   assert.equal(r.assignments.get('gus.hall@example.edu').get(0).sessionIndex, robotics);
+});
+
+// ------------------------------- one activity, two lengths
+
+const DURATION = { sessions: 'sessions-duration-pair.csv', responses: 'responses-duration-pair.csv' };
+
+test('sessions named only by a differing block count share an exclusion group', () => {
+  const { sessions, report } = scenario(DURATION);
+  const groups = exclusionGroups(sessions).map(g => [...g].map(i => sessions[i].name).sort());
+  const cycling = groups.find(g => g.length > 1);
+  assert.deepEqual(cycling, ['Cycling (1 block)', 'Cycling (2 blocks)']);
+  // A parenthetical that is not a block count is a real difference in the
+  // activity, so those sessions stay independent and a student may take both.
+  assert.equal(groups.length, 4, JSON.stringify(groups));
+  assert.ok(groups.some(g => g.length === 1 && g[0] === 'Studio (painting)'));
+  assert.ok(groups.some(g => g.length === 1 && g[0] === 'Studio (sculpture)'));
+  // The guess is never silent.
+  assert.ok(says(report.warnings, 'identical apart from the block count in brackets'));
+  assert.ok(says(report.warnings, '(1 block) and (2 blocks)'));
+});
+
+test('nobody is placed in two sessions that are one activity at two lengths', () => {
+  const r = run(DURATION);
+  assert.deepEqual(checkInvariants(r), []);
+  for (const st of r.students) {
+    const names = [...new Set([...r.assignments.get(st.email).values()]
+      .map(v => r.sessions[v.sessionIndex].name))];
+    const cycling = names.filter(n => n.startsWith('Cycling'));
+    assert.equal(cycling.length, 1, `${st.email} got ${cycling.join(' + ')}`);
+  }
+  // Both studios in one day is fine: different activities, not two lengths.
+  const cy = [...r.assignments.get('cy.diaz@example.edu').values()]
+    .map(v => r.sessions[v.sessionIndex].name);
+  assert.ok(cy.includes('Studio (painting)') && cy.includes('Studio (sculpture)'));
+});
+
+test('a student rated both lengths top marks still only gets one of them', () => {
+  // ada rates both 5 and everything else 1, so without the group constraint the
+  // solver would hand her both. Checked by mutation: it does.
+  const r = run(DURATION);
+  const slots = [...r.assignments.get('ada.byron@example.edu').values()];
+  assert.equal(slots.filter(v => r.sessions[v.sessionIndex].name.startsWith('Cycling')).length, 1);
+});
+
+test('pinning a student to both lengths is reported, not silently dropped', () => {
+  const s = scenario({ ...DURATION, overrides: 'ov-duration-conflict.csv' });
+  const r = solve({ highs, ...s, report: s.report });
+  assert.ok(says(s.report.errors, 'one activity at two different lengths'), JSON.stringify(s.report.errors));
+  assert.ok(says(s.report.errors, 'Cycling (1 block)'));
+  assert.ok(says(s.report.errors, 'Cycling (2 blocks)'));
+  assert.ok(r, 'the run still returns a result rather than throwing');
 });
 
 /** A stable string for the whole result, so two runs can be compared exactly. */

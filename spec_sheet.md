@@ -185,8 +185,17 @@ Hard constraints:
 * A multi-block session places the student in it for all of its blocks.
 * No session run exceeds "Max Students Per Session".
 * A student is never placed in the same session twice.
+* A student is never placed in two sessions that are **the same activity offered at different lengths**, detected from the session names (see the clarification below).
 * Non-respondents are only placed in sessions marked **YES** for "Can be Randomly Assigned?" (unless pinned by an override).
 * Every `Pin` override is satisfied, no `Exclude`d session is assigned, and `Free` blocks stay empty.
+
+> **Clarification: one activity, two lengths.** A session is sometimes offered twice at different durations, named like `Cycling (1 block)` and `Cycling (2 blocks)`. These are one activity, so a student placed in one must not also be placed in the other; otherwise they spend their day doing the same thing twice.
+>
+> The app detects this from the names alone, with no extra input file. Two sessions are treated as one activity when their names are identical once a **trailing block count in brackets** is removed. The rule is deliberately narrow: only a block count counts, so `Studio (painting)` and `Studio (sculpture)` stay two independent sessions a student may take both of.
+>
+> **Every pair it finds is reported as a warning**, naming both sessions and the bracketed labels it matched on, because a silent guess that puts a student in the wrong room is worse than no guess. The fix for a false positive is to rename one session so the names differ by more than the bracket.
+>
+> Internally each session carries an `exclusionGroup`; sessions in a group are mutually exclusive, and a lone session is a group of one. The "never the same session twice" rule above is the same rule applied to a group of one, not a second mechanism.
 
 > **Clarification: non-respondents.** All students (respondents and non-respondents) are scheduled in one optimization, so non-respondents can never be left without seats because respondents took them first. Non-respondents have no ratings, so they contribute nothing to the satisfaction score; to spread them out instead of clustering them in the first sessions listed, each of their eligible options gets a tiny seeded jitter weight (far smaller than 1).
 
@@ -309,6 +318,7 @@ Invariants (checked on every scheduling result):
 * No session run exceeds its capacity.
 * Multi-block sessions occupy their full set of blocks, and every student in them is in them for all of those blocks.
 * No student is in the same session twice.
+* No student is in two sessions from the same exclusion group, i.e. one activity at two different lengths.
 * No non-respondent is in a session marked "No", unless pinned there.
 * Every `Pin` is honored, no `Exclude` is violated, every `Free` block is empty and does not count as unplaced.
 * Overrides made in the editor and then exported/re-uploaded as Overrides.csv give an identical result.

@@ -36,7 +36,14 @@ Pages straight from the repo root.
    (`js/solve.js` `hash()`), ties break on sorted email, HiGHS runs with
    `random_seed` fixed and zero MIP gap. Row order of an input file must never
    change the result.
-6. **`npm test` must pass before you call anything done.**
+6. **Never guess a student into the wrong room.** Where two sheets disagree,
+   match only on evidence and report what you could not resolve. The one
+   inference allowed is the duration pair: `Cycling (1 block)` and
+   `Cycling (2 blocks)` are one activity, so they share an `exclusionGroup`
+   and no student gets both. Only a trailing block count in brackets counts,
+   and every pair found is warned about. Widening that rule needs a test
+   showing it cannot swallow two genuinely different sessions.
+7. **`npm test` must pass before you call anything done.**
 
 ## Layout
 

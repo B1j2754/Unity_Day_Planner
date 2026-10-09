@@ -38,6 +38,25 @@ function hash(str) {
   return h;
 }
 
+/**
+ * Session indexes a student may take at most one placement from. Normally one
+ * session on its own, but two sessions that are a single activity at different
+ * lengths share a group (see `assignExclusionGroups` in parse.js), so taking
+ * the 1-block version rules out the 2-block one.
+ */
+export function exclusionGroups(sessions) {
+  const byGroup = new Map();
+  sessions.forEach((s, i) => {
+    const g = s.exclusionGroup ?? `solo-${i}`;
+    if (!byGroup.has(g)) byGroup.set(g, new Set());
+    byGroup.get(g).add(i);
+  });
+  return [...byGroup.values()];
+}
+
+/** The group a session belongs to, falling back to the session itself. */
+const groupKey = (sessions, i) => sessions[i].exclusionGroup ?? `solo-${i}`;
+
 /** One run of a session: the session, its start block, and the blocks it covers. */
 export function buildRuns(sessions) {
   const runs = [];
@@ -87,11 +106,20 @@ function collectOverrides(overrides, sessions, runs, report) {
         pinsPerRun.set(rk, (pinsPerRun.get(rk) || 0) + 1);
       }
     }
-    // Two pins on one session would put the student in it twice.
-    const perSession = new Map();
-    for (const p of g.pins) perSession.set(p.sessionIndex, (perSession.get(p.sessionIndex) || 0) + 1);
-    for (const [si, n] of perSession) {
-      if (n > 1) report.error(`${who} is pinned to "${sessions[si].name}" more than once. A student cannot take the same session twice.`);
+    // Two pins on one session, or on two sessions that are one activity at two
+    // lengths, both ask for the same activity twice.
+    const perGroup = new Map();
+    for (const p of g.pins) {
+      const gk = groupKey(sessions, p.sessionIndex);
+      if (!perGroup.has(gk)) perGroup.set(gk, []);
+      perGroup.get(gk).push(p.sessionIndex);
+    }
+    for (const members of perGroup.values()) {
+      if (members.length < 2) continue;
+      const names = [...new Set(members.map(i => `"${sessions[i].name}"`))];
+      report.error(names.length === 1
+        ? `${who} is pinned to ${names[0]} more than once. A student cannot take the same session twice.`
+        : `${who} is pinned to both ${names.join(' and ')}, which are one activity at two different lengths. Keep only one of the two overrides.`);
     }
     // Pins with an explicit block that collide in time.
     const fixed = g.pins.filter(p => p.block !== null);
@@ -197,6 +225,7 @@ function attempt({ highs, sessions, students, runs, ov }, limit, report) {
     });
   });
 
+  const groups = exclusionGroups(sessions);
   const rows = [];                               // {lo, hi, idx}
   const fill = [];                               // row numbers of the per-block rows
   const colsFor = (si, pick) => [...colOf[si]].filter(([ri]) => pick(runs[ri])).map(([, c]) => c);
@@ -215,11 +244,13 @@ function attempt({ highs, sessions, students, runs, ov }, limit, report) {
       const i = add(1, 1, colsFor(si, r => r.blocks.includes(b)));
       if (i >= 0) fill.push(i);
     }
-    // Never the same session twice.
-    sessions.forEach((s, j) => {
-      if (s.starts.length < 2) return;
-      add(0, 1, colsFor(si, r => r.sessionIndex === j));
-    });
+    // Never the same session twice, and never two sessions that are one
+    // activity at two lengths. `idx.length > 1` skips the rows that could not
+    // bind anyway, which is most of them.
+    for (const group of groups) {
+      const idx = colsFor(si, r => group.has(r.sessionIndex));
+      if (idx.length > 1) add(0, 1, idx);
+    }
     // A pin with no block: the solver picks the run, but it must pick one.
     for (const p of g.pins) {
       if (p.block === null) add(1, 1, colsFor(si, r => r.sessionIndex === p.sessionIndex));
@@ -384,7 +415,7 @@ export function checkInvariants({ sessions, students, overrides, assignments, un
     }
 
     const slots = new Set(got.values());
-    const perSession = new Map();
+    const placedPerGroup = new Map();
     for (const slot of slots) {
       const run = runs.find(r => r.sessionIndex === slot.sessionIndex && r.start === slot.start);
       if (!run) { bad.push(`${st.email} is in a session run that does not exist.`); continue; }
@@ -393,7 +424,9 @@ export function checkInvariants({ sessions, students, overrides, assignments, un
           bad.push(`${st.email} is in "${sessions[slot.sessionIndex].name}" but not for all of blocks ${run.blocks.map(x => BLOCKS[x]).join(', ')}.`);
         }
       }
-      perSession.set(slot.sessionIndex, (perSession.get(slot.sessionIndex) || 0) + 1);
+      const gk = groupKey(sessions, slot.sessionIndex);
+      if (!placedPerGroup.has(gk)) placedPerGroup.set(gk, []);
+      placedPerGroup.get(gk).push(slot.sessionIndex);
       const rk = `${slot.sessionIndex}|${slot.start}`;
       seats.set(rk, (seats.get(rk) || 0) + 1);
 
@@ -405,8 +438,12 @@ export function checkInvariants({ sessions, students, overrides, assignments, un
         bad.push(`${st.email} is in "${sessions[slot.sessionIndex].name}" but is excluded from it.`);
       }
     }
-    for (const [si, n] of perSession) {
-      if (n > 1) bad.push(`${st.email} is in "${sessions[si].name}" ${n} times.`);
+    for (const members of placedPerGroup.values()) {
+      if (members.length < 2) continue;
+      const names = [...new Set(members.map(i => sessions[i].name))];
+      bad.push(names.length === 1
+        ? `${st.email} is in "${names[0]}" ${members.length} times.`
+        : `${st.email} is in both "${names.join('" and "')}", which are one activity at two different lengths.`);
     }
     for (const p of pinOf.get(k) || []) {
       const ok = [...slots].some(s => s.sessionIndex === p.sessionIndex && (p.block === null || s.start === p.block));

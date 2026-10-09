@@ -1,0 +1,7 @@
+Session Name,Session Organizer Name,Session Organizer Contact Email Address,Location,Max Students Per Session,Blocks,Length of Session (in blocks),Can be Randomly Assigned?
+The name as it appears on sheets,The main adult running it,Point of contact,Room number or instructions,Per run,Start blocks; blank for the default,1 to 4,Can non-respondents be put here
+Chess Club,Kim Vale,kim.vale@example.org,Room 3,10,ABCD,1,Yes
+Cycling (1 block),Dana Reed,dana.reed@example.org,Track,10,ABCD,1,Yes
+Cycling (2 blocks),Dana Reed,dana.reed@example.org,Track,10,AC,2,Yes
+Studio (painting),Lee Park,lee.park@example.org,Room 12,10,ABCD,1,Yes
+Studio (sculpture),Sam Cole,sam.cole@example.org,Room 14,10,ABCD,1,Yes

@@ -279,6 +279,8 @@ export function parseSessions(rows, report = new Report()) {
 
   spreadSpareBlocks(sessions);
 
+  assignExclusionGroups(sessions, report);
+
   // What a student sees. A session name is often a whole sentence — the title
   // plus a description — and only the title belongs on a schedule sheet. The
   // full name is kept for staff-facing messages, and is used on the sheet too
@@ -309,6 +311,16 @@ const flatten = s => key(s)
  * so the title is the only part the two sheets have in common.
  */
 const splitTitle = s => String(s ?? '').split(/[\r\n–—]|\s-\s|:\s|\s\(|\s\[/)[0].trim();
+
+/**
+ * A trailing duration label, as in "Cycling (1 block)" / "Cycling (2 blocks)".
+ * Deliberately narrow: only a block count counts as one, so "Studio (painting)"
+ * and "Studio (sculpture)" stay two independent sessions.
+ */
+const DURATION_LABEL = /\s*\(\s*\d+\s*blocks?\s*\)\s*$/i;
+
+/** The activity a session name names, with any duration label taken off. */
+const activityOf = name => flatten(String(name ?? '').replace(DURATION_LABEL, ''));
 const titleOf = s => flatten(splitTitle(s));
 
 /**
@@ -365,6 +377,38 @@ function matchSession(header, sessions, titles) {
 }
 
 /** Short titles, blanked out wherever two sessions would share one. */
+/**
+ * Gives every session an `exclusionGroup`. Sessions whose names are the same
+ * once a trailing duration label is removed share one, because they are a
+ * single activity offered at two lengths and nobody should be put in both.
+ * Every other session is alone in its group, so the solver rule stays uniform:
+ * at most one placement per group per student.
+ *
+ * Duplicate session names are already an error by the time this runs, so two
+ * sessions can only share a group by having had a label stripped.
+ */
+function assignExclusionGroups(sessions, report) {
+  const byActivity = new Map();
+  sessions.forEach((s, i) => {
+    const a = activityOf(s.name);
+    if (!byActivity.has(a)) byActivity.set(a, []);
+    byActivity.get(a).push(i);
+  });
+  let g = 0;
+  for (const members of byActivity.values()) {
+    for (const i of members) sessions[i].exclusionGroup = g;
+    if (members.length > 1) {
+      const names = members.map(i => `"${sessions[i].name}"`).join(' and ');
+      const labels = members
+        .map(i => (sessions[i].name.match(DURATION_LABEL) || [''])[0].trim())
+        .filter(Boolean)
+        .join(' and ');
+      report.warn(`${names} are being treated as one activity offered at different lengths, because their names are identical apart from the block count in brackets: ${labels}. No student will be placed in more than one of them. If they are genuinely separate sessions, rename one so the names differ by more than the bracket.`);
+    }
+    g++;
+  }
+}
+
 function sessionTitles(sessions) {
   const titles = sessions.map(s => titleOf(s.name));
   const seen = new Map();
