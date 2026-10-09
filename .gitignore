@@ -8,3 +8,17 @@ node_modules/
 /*.xlsx
 /*.xls
 private/
+
+# Downloaded outputs, wherever they land. They are rebuilt from the inputs.
+unity-day_*.csv
+unity-day_*.zip
+
+# Spreadsheets anywhere, not just the repo root, in case an export is dropped
+# into a subfolder. Negated for the two directories that hold no real data.
+*.csv
+*.xlsx
+*.xls
+*.xlsm
+*.ods
+!templates/**
+!tests/fixtures/**

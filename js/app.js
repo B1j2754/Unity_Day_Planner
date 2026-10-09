@@ -7,8 +7,8 @@ import {
   parseNonRespondents, parseOverrides, overridesToRows,
 } from './parse.js';
 import {
-  MAIL_MERGE_FILE, MAIL_MERGE_COLUMNS, UNPLACED_FILE, PNG_ZIP_FILE,
-  STAFF_MAIL_MERGE_FILE, STAFF_MAIL_MERGE_COLUMNS, ROSTER_ZIP_FILE,
+  MAIL_MERGE_FILE, UNPLACED_FILE, PNG_ZIP_FILE,
+  STAFF_MAIL_MERGE_FILE, ROSTER_ZIP_FILE,
   mailMergeRows, unplacedRows, scheduleRows, toCSV, drawSchedule,
   rosters, staffMailMergeRows, drawRoster,
 } from './output.js';
@@ -543,7 +543,9 @@ function flash(btn, text) {
 // -------------------------------------------------------------- downloads
 
 function download(name, data, type = 'text/csv;charset=utf-8') {
-  const blob = data instanceof Blob ? data : new Blob([data], { type });
+  // Text files lead with a byte-order mark, so Word and Excel read them as
+  // UTF-8 and do not mangle en dashes or curly apostrophes in session names.
+  const blob = data instanceof Blob ? data : new Blob(['﻿', data], { type });
   const url = URL.createObjectURL(blob);
   const a = el('a');
   a.href = url;
@@ -552,22 +554,16 @@ function download(name, data, type = 'text/csv;charset=utf-8') {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
-function downloadXlsx(name, rows, columns) {
-  const ws = XLSX.utils.json_to_sheet(rows, { header: columns });
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'MailMerge');
-  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  download(name, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-}
-
+// Both merges are .csv, not .xlsx: Word truncates a long field at 255
+// characters when it reads one out of Excel, and a roster runs to thousands.
 $('#dl-merge').onclick = () => {
-  downloadXlsx(MAIL_MERGE_FILE, mailMergeRows(orderedStudents(), state.result.assignments, state.sessions), MAIL_MERGE_COLUMNS);
+  download(MAIL_MERGE_FILE, toCSV(mailMergeRows(orderedStudents(), state.result.assignments, state.sessions)));
 };
 
 const organizerRosters = () => rosters(orderedStudents(), state.result.assignments, state.sessions);
 
 $('#dl-staff-merge').onclick = () => {
-  downloadXlsx(STAFF_MAIL_MERGE_FILE, staffMailMergeRows(organizerRosters()), STAFF_MAIL_MERGE_COLUMNS);
+  download(STAFF_MAIL_MERGE_FILE, toCSV(staffMailMergeRows(organizerRosters())));
 };
 
 $('#dl-unplaced').onclick = () => {

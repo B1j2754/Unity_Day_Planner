@@ -18,10 +18,14 @@ no server and no database. Close the tab and nothing is kept.
 4. Read the numbers and the warnings. Fix anybody who needs fixing in the
    Overrides table, then press **Re-generate with overrides**.
 5. Download:
-   - `unity-day_mail-merge.xlsx` — feed this to the Outlook Power Automate flow.
+   - `unity-day_mail-merge.csv` — the data source for a Word mail merge.
    - `unity-day_schedules.zip` — one PNG per student, named after their email.
-   - `unity-day_staff-mail-merge.xlsx` — the same idea for the adults running
-     sessions, one row each, with their roster. Needs its own flow.
+   - `unity-day_staff-mail-merge.csv` — the same idea for the adults running
+     sessions, one row each, with their roster. Needs its own Word
+     template, and the `«Roster_Text»` field in it **must be Courier
+     New** — the roster is a grid built out of spaces, so the cells only
+     line up in a monospaced font. The student `«Schedule_Text»` needs no
+     special font.
    - `unity-day_rosters.zip` — one PNG per organizer: every run they have, who
      is in it, and which blocks they are free.
    - `unity-day_unplaced.csv` — anyone who needs placing by hand.

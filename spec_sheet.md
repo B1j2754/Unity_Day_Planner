@@ -234,14 +234,18 @@ A simple table of the current overrides (loaded from Overrides.csv if uploaded, 
 
 5 outputs are required: three for students, two for the adults running sessions
 
-1. Power-Automate-acceptable output
-    * One file output: `unity-day_mail-merge.xlsx`
+1. Student mail merge
+    * One file output: `unity-day_mail-merge.csv`
     * One row per student, with the following columns:
         * "Email": The student's email
         * "Name": The student's preferred name
-        * "Schedule_HTML": The student's schedule list, as a simple HTML table
-    * This is meant to be used with Microsoft Outlook's Power Automate function, meaning a flow will read this and build all the emails for the students
-    * > **Clarification:** The file name and column names above are a fixed contract with the Power Automate flow. Never change them without updating the flow. Includes non-respondents; excludes unplaced students.
+        * "Full_Name": The student's name as given on the form
+        * "Grade": The student's grade, blank if not collected or not 9-12
+        * "Schedule_Text": The student's whole day as plain text
+    * Meant for __Microsoft Word mail merge__, which school admin already know. Word reads the file, and one `«Schedule_Text»` field in the template becomes the schedule.
+    * > **Clarification: why plain text and not a table of columns.** Most students read this on a phone. A bordered table of BLOCK / SESSION / ROOM / RUN BY needs about 75 characters a line once real session names are in it, which a phone either shrinks to nothing or wraps, and a wrapped table puts its borders in the wrong places. So the schedule is stacked instead: a `BLOCK x` heading, then the session, room and who runs it, each on its own short line. Nothing depends on alignment, every line fits a phone, and the Word template does __not__ need a monospaced font.
+    * > **Clarification: why .csv and not .xlsx.** Word truncates a merge field at 255 characters when it reads one out of Excel. Reading the same field out of a .csv does not truncate — confirmed by sending a 4,336-character field with 80 line breaks through Word intact. The file is written with a UTF-8 byte-order mark so Word does not mangle en dashes or curly apostrophes in session names.
+    * > **Clarification:** The file name and column names above are a fixed contract with the Word template. Never change them without updating the template. Includes non-respondents; excludes unplaced students.
 
 2. PNG Zip File
     * A zip file of PNGs, containing all the students' schedules
@@ -250,17 +254,19 @@ A simple table of the current overrides (loaded from Overrides.csv if uploaded, 
     * > **Clarification:** Includes non-respondents; excludes unplaced students.
 
 3. Staff mail merge
-    * One file output: `unity-day_staff-mail-merge.xlsx`
+    * One file output: `unity-day_staff-mail-merge.csv`
     * One row per __organizer__, not per session. Everything one adult runs all day lands in a single row, so they get one email rather than one per session. Keyed on "Session Organizer Contact Email Address".
     * Columns:
         * "Email": the organizer's email
         * "Name": the organizer's name, as written in Sessions.csv
-        * "Roster_HTML": their whole day as an HTML table, one section per run, each listing the students placed in it
+        * "Roster_Text": their whole day as plain text, one section per run, each listing the students placed in it as an aligned register
         * "Sessions": the session names they run, comma separated, plain text
         * "Blocks": the blocks they are running in, e.g. `A, C, D`, plain text
         * "Student_Count": how many students they see across the day, as a number
-    * The last three are plain text so the Power Automate flow can put real detail in the subject line without having to read the HTML
-    * > **Clarification:** This is a second flow, separate from the student one. The file name and all six column names are a fixed contract with it.
+    * The last three are short plain-text values so the Word template can put real detail in the subject line or opening paragraph
+    * __The `«Roster_Text»` field must be set to a monospaced font (Courier New) in the Word template.__ The roster is a grid drawn with spaces, so every cell only lines up if every character is the same width. In a proportional font such as Calibri the columns collapse into ragged text and the register becomes unreadable.
+    * > **Clarification:** this is the opposite of the student schedule, which is stacked and needs no monospaced font. A register is read in columns, and staff print it or read it on a laptop rather than a phone.
+    * > **Clarification:** This is a second Word template, separate from the student one. The file name and all six column names are a fixed contract with it.
     * > **Clarification:** A session whose organizer has no email is skipped, with no warning. There is nowhere to send the roster and nothing to name the file after. Staff who need one without an email should be given it by hand.
 
 4. Roster PNG Zip File
@@ -336,9 +342,11 @@ Input validation (each has a fixture file with the expected error/warning):
 * Block with fewer total seats than students
 
 Output:
-* Mail-merge xlsx has exactly the columns `Email`, `Name`, `Schedule_HTML`, one row per scheduled student.
+* Mail-merge csv has exactly the columns `Email`, `Name`, `Full_Name`, `Grade`, `Schedule_Text`, one row per scheduled student.
+* No line of a `Schedule_Text` is wide enough to wrap on a phone, and it contains no table borders.
 * Zip contains one PNG per scheduled student, named `<email>.png`.
-* Staff mail-merge xlsx has exactly the columns `Email`, `Name`, `Roster_HTML`, `Sessions`, `Blocks`, `Student_Count`, one row per organizer email.
+* Staff mail-merge csv has exactly the columns `Email`, `Name`, `Roster_Text`, `Sessions`, `Blocks`, `Student_Count`, one row per organizer email.
+* Every `Roster_Text` is a space-aligned grid, so the Word template must render it in a monospaced font (Courier New); rows do not line up in a proportional font.
 * Roster zip contains one PNG per organizer email, named `<email>.png`.
 * A roster lists exactly the students the solver placed in that run, no more and no fewer, and keeps runs that came out empty.
 * An organizer with no email appears in neither staff output.

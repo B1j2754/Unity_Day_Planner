@@ -1,17 +1,24 @@
 // Assignments -> the deliverables. Two sets: what each student gets, and what
-// each adult running a session gets. Both mail-merge file names and all of
-// their column names are a contract with an Outlook Power Automate flow, which
-// looks the values up by column name — renaming one breaks that flow.
+// each adult running a session gets.
+//
+// The two mail-merge files feed Microsoft Word's mail merge. Word picks the
+// values up by column name, so the file names and every column name below are
+// a contract with the Word templates — renaming one breaks a template.
+//
+// They are .csv, not .xlsx, and written with a UTF-8 byte-order mark so Word
+// reads en dashes and curly apostrophes correctly. CSV also sidesteps the
+// 255-character ceiling Word imposes on long fields coming from Excel, which
+// matters because a roster runs to several thousand characters.
 
 import { BLOCKS, key } from './parse.js';
 
-export const MAIL_MERGE_FILE = 'unity-day_mail-merge.xlsx';
-export const MAIL_MERGE_COLUMNS = ['Email', 'Name', 'Schedule_HTML'];
+export const MAIL_MERGE_FILE = 'unity-day_mail-merge.csv';
+export const MAIL_MERGE_COLUMNS = ['Email', 'Name', 'Full_Name', 'Grade', 'Schedule_Text'];
 export const UNPLACED_FILE = 'unity-day_unplaced.csv';
 export const PNG_ZIP_FILE = 'unity-day_schedules.zip';
 
-export const STAFF_MAIL_MERGE_FILE = 'unity-day_staff-mail-merge.xlsx';
-export const STAFF_MAIL_MERGE_COLUMNS = ['Email', 'Name', 'Roster_HTML', 'Sessions', 'Blocks', 'Student_Count'];
+export const STAFF_MAIL_MERGE_FILE = 'unity-day_staff-mail-merge.csv';
+export const STAFF_MAIL_MERGE_COLUMNS = ['Email', 'Name', 'Roster_Text', 'Sessions', 'Blocks', 'Student_Count'];
 export const ROSTER_ZIP_FILE = 'unity-day_rosters.zip';
 
 /**
@@ -38,28 +45,57 @@ export function scheduleRows(got, sessions) {
   });
 }
 
-const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-
-/** Simple table, inline styles only — Outlook strips everything else. */
-export function scheduleHTML(rows) {
-  const cell = (v, extra = '') => `<td style="border:1px solid #ccc;padding:6px 10px;${extra}">${esc(v)}</td>`;
-  const body = rows.map(r => {
-    const who = [r.organizer, r.email].filter(Boolean).join(' &middot; ');
-    return `<tr>${cell(r.blocks, 'font-weight:bold;white-space:nowrap;')}${cell(r.session)}${cell(r.location)}<td style="border:1px solid #ccc;padding:6px 10px;">${who}</td></tr>`;
-  }).join('');
-  const head = ['Block', 'Session', 'Location', 'Run by']
-    .map(h => `<th style="border:1px solid #ccc;padding:6px 10px;text-align:left;background:#f4f4f4;">${h}</th>`).join('');
-  return `<table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+/**
+ * A fixed-width table drawn in plain characters. Lines up only in a monospaced
+ * font, so the Word template has to set the merge field to Courier New.
+ * CRLF throughout, because that is what Word expects inside a field.
+ */
+function asciiTable(headers, rows) {
+  const w = headers.map((h, i) => Math.max(h.length, ...rows.map(r => String(r[i] ?? '').length)));
+  const rule = '+' + w.map(n => '-'.repeat(n + 2)).join('+') + '+';
+  const line = cells => '| ' + cells.map((c, i) => String(c ?? '').padEnd(w[i])).join(' | ') + ' |';
+  return [rule, line(headers), rule, ...rows.map(line), rule].join('\r\n');
 }
 
-/** One row per scheduled student, in the shape the Power Automate flow expects. */
+/** Block labels for plain text: ASCII hyphen, never an en dash. */
+const plain = label => String(label ?? '').replace(/[–—·]/g, '-');
+
+/**
+ * A student's whole day as plain text, for a single merge field.
+ *
+ * Deliberately NOT a bordered table. Most students read this on a phone, and a
+ * four-column grid needs about 75 characters a line once real session names are
+ * in it — which a phone either shrinks to nothing or wraps, and a wrapped grid
+ * puts its borders in the wrong places. Stacked blocks have no alignment to
+ * break: every line is short, wrapping is harmless, and the Word template does
+ * not need a monospaced font.
+ */
+export function scheduleText(rows, student) {
+  const out = ['UNITY DAY SCHEDULE'];
+  out.push([student.name, student.grade && `Grade ${student.grade}`].filter(Boolean).join('  -  '));
+  for (const r of rows) {
+    out.push('', `BLOCK ${plain(r.blocks)}`);
+    out.push(`  ${r.session}`);
+    if (r.location) out.push(`  ${r.location}`);
+    const who = r.email ? `${r.organizer} (${r.email})` : r.organizer;
+    if (who) out.push(`  ${who}`);
+  }
+  return out.join('\r\n');
+}
+
+/**
+ * One row per scheduled student. Email, Name and Grade are their own columns so
+ * the template can address and greet them; the schedule itself is one field.
+ */
 export function mailMergeRows(students, assignments, sessions) {
   return students
     .filter(s => assignments.has(s.email))
-    .map(s => ({
-      Email: s.email,
-      Name: s.name,
-      Schedule_HTML: scheduleHTML(scheduleRows(assignments.get(s.email), sessions)),
+    .map(student => ({
+      Email: student.email,
+      Name: student.name,
+      Full_Name: student.fullName,
+      Grade: student.grade || '',
+      Schedule_Text: scheduleText(scheduleRows(assignments.get(student.email), sessions), student),
     }));
 }
 
@@ -158,27 +194,39 @@ const runTitle = run => [
   run.session.location,
 ].filter(Boolean).join(' · ');
 
-export function rosterHTML(org) {
-  const td = (v, extra = '') => `<td style="border:1px solid #ccc;padding:5px 10px;${extra}">${esc(v)}</td>`;
-  const sections = org.runs.map(run => {
-    const head = `<tr><td colspan="4" style="border:1px solid #ccc;padding:7px 10px;background:#f4f4f4;font-weight:bold;">${esc(runTitle(run))} &mdash; ${run.students.length} of ${run.session.capacity}</td></tr>`;
-    if (!run.students.length) {
-      return head + `<tr>${td('No students in this one.', 'color:#767676;')}<td colspan="3" style="border:1px solid #ccc;"></td></tr>`;
-    }
-    const cols = `<tr>${['Student', 'Goes by', 'Grade', 'Email'].map(h => `<td style="border:1px solid #ccc;padding:4px 10px;font-size:12px;color:#555;">${h}</td>`).join('')}</tr>`;
-    const rows = run.students.map(s =>
-      `<tr>${td(listedName(s.fullName))}${td(s.name)}${td(s.grade || '—')}${td(s.email)}</tr>`).join('');
-    return head + cols + rows;
-  }).join('');
-  return `<table style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;"><tbody>${sections}</tbody></table>`;
+/**
+ * An organizer's whole day as plain text: a heading, then one block per run
+ * with its register under it. Several thousand characters for a busy teacher,
+ * which Word carries fine from a .csv.
+ */
+export function rosterText(org) {
+  const out = [
+    `UNITY DAY ROSTER - ${org.name}`,
+    [
+      org.email,
+      `${org.runs.length} ${org.runs.length === 1 ? 'run' : 'runs'}`,
+      `${org.studentCount} ${org.studentCount === 1 ? 'student' : 'students'}`,
+      org.free.length ? `free in ${org.free.map(b => BLOCKS[b]).join(', ')}` : 'running all four blocks',
+    ].join('  -  '),
+    '',
+  ];
+  for (const run of org.runs) {
+    out.push(`${plain(runTitle(run))}   ${run.students.length} of ${run.session.capacity}`);
+    out.push(run.students.length
+      ? asciiTable(['#', 'STUDENT', 'GOES BY', 'GRADE', 'EMAIL'],
+        run.students.map((st, i) => [i + 1, listedName(st.fullName), st.name, st.grade || '-', st.email]))
+      : '  (nobody in this one)');
+    out.push('');
+  }
+  return out.join('\r\n').trimEnd();
 }
 
-/** One row per organizer, for the staff Power Automate flow. */
+/** One row per organizer, for the staff Word mail merge. */
 export function staffMailMergeRows(orgs) {
   return orgs.map(org => ({
     Email: org.email,
     Name: org.name,
-    Roster_HTML: rosterHTML(org),
+    Roster_Text: rosterText(org),
     Sessions: org.sessionNames.join(', '),
     Blocks: [...new Set(org.runs.flatMap(r => r.blocks))].sort((a, b) => a - b).map(b => BLOCKS[b]).join(', '),
     Student_Count: org.studentCount,

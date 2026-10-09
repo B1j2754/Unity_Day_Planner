@@ -20,11 +20,18 @@ Pages straight from the repo root.
    real export in here, it does not get committed.
 3. **No build step.** Plain ES modules, relative paths, no bundler, no
    transpile. If you reach for a bundler, you have taken a wrong turn.
-4. **The Power Automate contracts are frozen.** Two flows, two files:
-   `unity-day_mail-merge.xlsx` with `Email` / `Name` / `Schedule_HTML` for
-   students, and `unity-day_staff-mail-merge.xlsx` with `Email` / `Name` /
-   `Roster_HTML` / `Sessions` / `Blocks` / `Student_Count` for the adults
-   running sessions. Changing any of those strings breaks a live Outlook flow.
+4. **The Word mail-merge contracts are frozen.** Two templates, two files:
+   `unity-day_mail-merge.csv` with `Email` / `Name` / `Full_Name` / `Grade` /
+   `Schedule_Text` for students, and `unity-day_staff-mail-merge.csv` with
+   `Email` / `Name` / `Roster_Text` / `Sessions` / `Blocks` / `Student_Count`
+   for the adults running sessions. Changing any of those strings breaks a
+   Word template someone already built.
+
+   They are `.csv`, never `.xlsx`: Word truncates a merge field at 255
+   characters when reading from Excel, and a roster is thousands. They carry a
+   UTF-8 BOM so Word reads en dashes correctly. Student schedules are stacked
+   plain text with no alignment, because students read them on phones; staff
+   rosters are column-aligned and need a monospaced font in the template.
 5. **Determinism.** Same inputs, same bytes out. All randomness is seeded
    (`js/solve.js` `hash()`), ties break on sorted email, HiGHS runs with
    `random_seed` fixed and zero MIP gap. Row order of an input file must never
@@ -40,7 +47,7 @@ templates/         blank input files staff download from the page, plus the colu
 css/components.css the library itself: tokens + every component class
 js/parse.js        CSV text -> validated sessions / students / overrides  (pure, no DOM)
 js/solve.js        validated data -> assignments                          (pure, no DOM)
-js/output.js       assignments -> mail-merge rows, schedule HTML, PNG, CSVs
+js/output.js       assignments -> merge rows, schedule/roster text, PNG, CSVs
 js/app.js          all the DOM wiring. The only file that touches the page.
 js/solver.worker.js  runs solve.js off the main thread
 vendor/            highs (WASM solver), xlsx (SheetJS), fflate (zip). Committed on purpose.

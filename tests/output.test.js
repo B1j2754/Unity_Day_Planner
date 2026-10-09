@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { run, scenario } from './helpers.js';
 import {
-  MAIL_MERGE_COLUMNS, mailMergeRows, unplacedRows, scheduleRows, scheduleHTML, toCSV,
-  STAFF_MAIL_MERGE_COLUMNS, rosters, rosterHTML, staffMailMergeRows, listedName,
+  MAIL_MERGE_COLUMNS, mailMergeRows, unplacedRows, scheduleRows, scheduleText, toCSV,
+  STAFF_MAIL_MERGE_COLUMNS, rosters, rosterText, staffMailMergeRows, listedName,
 } from '../js/output.js';
 
 test('the mail merge has exactly the three contract columns, one row per scheduled student', () => {
@@ -13,7 +13,7 @@ test('the mail merge has exactly the three contract columns, one row per schedul
   assert.equal(rows.length, 8, 'includes the non-respondents');
   for (const row of rows) {
     assert.deepEqual(Object.keys(row), MAIL_MERGE_COLUMNS);
-    assert.match(row.Schedule_HTML, /^<table/);
+    assert.match(row.Schedule_Text, /^UNITY DAY SCHEDULE/);
   }
 });
 
@@ -57,12 +57,29 @@ test('a multi-block session shows as one merged row, and a free block says Free'
   assert.equal(cy.at(-1).blocks, 'D');
 });
 
-test('the schedule HTML escapes anything odd in a session name', () => {
-  const sessions = [{ name: 'Fun & <Games>', location: 'Room "1"', organizer: 'Dana', email: '', length: 1, starts: [0] }];
-  const got = new Map([[0, { sessionIndex: 0, start: 0 }]]);
-  const html = scheduleHTML(scheduleRows(got, sessions));
-  assert.ok(html.includes('Fun &amp; &lt;Games&gt;'));
-  assert.ok(html.includes('Room &quot;1&quot;'));
+test('a schedule reads as short stacked lines, not a wide table', () => {
+  const r = run({ nonrespondents: 'nonrespondents.csv' });
+  for (const row of mailMergeRows(r.students, r.assignments, r.sessions)) {
+    const lines = row.Schedule_Text.split('\r\n');
+    assert.equal(lines[0], 'UNITY DAY SCHEDULE');
+    // Students read these on a phone, so nothing may depend on column
+    // alignment and no line may be wide enough to wrap badly.
+    for (const l of lines) assert.ok(l.length <= 48, `too wide for a phone: "${l}"`);
+    assert.ok(!row.Schedule_Text.includes('|'), 'no table borders');
+    assert.ok(!/[–—·]/.test(row.Schedule_Text), 'plain ASCII punctuation only');
+    // One BLOCK heading per distinct slot in that student's day.
+    const slots = scheduleRows(r.assignments.get(row.Email), r.sessions).length;
+    assert.equal(lines.filter(l => l.startsWith('BLOCK ')).length, slots);
+  }
+});
+
+test('a free block says Free, and a multi-block session shows its range', () => {
+  const r = run({ nonrespondents: 'nonrespondents.csv', overrides: 'overrides.csv' });
+  const rows = mailMergeRows(r.students, r.assignments, r.sessions);
+  const cy = rows.find(x => x.Email.startsWith('cy.diaz'));
+  assert.ok(cy.Schedule_Text.includes('BLOCK D\r\n  Free'), cy.Schedule_Text);
+  const ada = rows.find(x => x.Email.startsWith('ada.byron'));
+  assert.ok(ada.Schedule_Text.includes('BLOCK A-C'), ada.Schedule_Text);
 });
 
 test('CSV quoting survives commas, quotes and newlines', () => {
@@ -129,7 +146,7 @@ test('the staff mail merge has the six contract columns, one row per organizer',
   assert.equal(rows.length, orgs.length);
   for (const row of rows) {
     assert.deepEqual(Object.keys(row), STAFF_MAIL_MERGE_COLUMNS);
-    assert.match(row.Roster_HTML, /^<table/);
+    assert.match(row.Roster_Text, /^UNITY DAY ROSTER - /);
     assert.ok(row.Email.includes('@'));
     assert.ok(row.Sessions.length > 0);
     assert.match(row.Blocks, /^[ABCD](, [ABCD])*$/);
@@ -164,21 +181,24 @@ test('a roster shows the blocks the organizer is free, and keeps empty runs', ()
     // An empty run is still listed; the adult standing in the room needs to know.
     assert.ok(o.runs.every(x => Array.isArray(x.students)));
   }
-  const html = rosterHTML(rosters(r.students, r.assignments, r.sessions)[0]);
-  assert.ok(html.includes('of '), 'each section shows filled of capacity');
+  const text = rosterText(rosters(r.students, r.assignments, r.sessions)[0]);
+  assert.ok(/ \d+ of \d+/.test(text), 'each section shows filled of capacity');
 });
 
-test('roster HTML escapes anything odd in a name or session', () => {
-  const org = {
-    email: 'a@b.org', name: 'Dana & Co', studentCount: 1, free: [], sessionNames: ['Fun & <Games>'],
-    runs: [{
-      session: { name: 'Fun & <Games>', displayName: 'Fun & <Games>', location: 'Room "1"', capacity: 5, length: 1 },
-      start: 0, blocks: [0],
-      students: [{ fullName: 'Ada <b>Byron</b>', name: 'Ada', grade: '11', email: 'ada@x.edu' }],
-    }],
-  };
-  const html = rosterHTML(org);
-  assert.ok(html.includes('Fun &amp; &lt;Games&gt;'));
-  assert.ok(html.includes('Room &quot;1&quot;'));
-  assert.ok(!html.includes('<b>Byron</b>'));
+test('a roster is an aligned register, and says when a run is empty', () => {
+  const r = run({ nonrespondents: 'nonrespondents.csv' });
+  for (const org of rosters(r.students, r.assignments, r.sessions)) {
+    const text = rosterText(org);
+    assert.ok(text.startsWith(`UNITY DAY ROSTER - ${org.name}`));
+    assert.ok(!/[–—·]/.test(text), 'plain ASCII punctuation only');
+    for (const x of org.runs) {
+      if (x.students.length) {
+        // A register is read in columns, so this one does line up. Teachers
+        // print it or read it on a laptop, unlike the student schedules.
+        for (const s of x.students) assert.ok(text.includes(s.email), `${s.email} missing`);
+      } else {
+        assert.ok(text.includes('(nobody in this one)'));
+      }
+    }
+  }
 });
